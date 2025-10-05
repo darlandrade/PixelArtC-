@@ -24,6 +24,9 @@ namespace PixelArt
         private Point? startPoint = null;   // ponto inicial do clique
         private Point currentPoint;         // posição atual do mouse
         private Bitmap previewBitmap;       // para desenhar preview temporário
+        private MouseButtons mouseButtonInUse; // Botão que iniciou o desenho
+        private Color secondaryColor = Color.White; // Cor do botão direito
+
 
 
         private List<Color> paletteColors = new List<Color>
@@ -133,6 +136,9 @@ namespace PixelArt
 
         }
 
+        private Panel panelLeftColor;
+        private Panel panelRightColor;
+
         private void CriarFuncoes()
         {
             Label lblPaleta = new Label
@@ -149,7 +155,6 @@ namespace PixelArt
             int margem = 5;
             int inicioY = lblPaleta.Bottom + 15;
 
-            // Limita espaço para até 15 cores
             for (int i = 0; i < 15; i++)
             {
                 Button colorBtn = new Button
@@ -159,15 +164,22 @@ namespace PixelArt
                     Left = 10 + (i % 5) * (btnSize + margem),
                     Top = inicioY + (i / 5) * (btnSize + margem),
                     BackColor = i < paletteColors.Count ? paletteColors[i] : Color.White,
-                    Enabled = i < paletteColors.Count,  // <-- nova linha
+                    Enabled = i < paletteColors.Count,
                     FlatStyle = FlatStyle.Flat
                 };
 
-                colorBtn.Click += (s, e) => currentColor = colorBtn.BackColor;
+                colorBtn.MouseDown += (s, e) =>
+                {
+                    if (!colorBtn.Enabled) return;
+                    if (e.Button == MouseButtons.Left) currentColor = colorBtn.BackColor;
+                    else if (e.Button == MouseButtons.Right) secondaryColor = colorBtn.BackColor;
+                    AtualizarIndicadoresDeCor();
+                };
+
                 panelFuncoes.Controls.Add(colorBtn);
             }
 
-
+            // Botão "+"
             Button btnAddColor = new Button
             {
                 Text = "+",
@@ -190,12 +202,42 @@ namespace PixelArt
                     }
                 }
                 else
-                {
                     MessageBox.Show("A paleta está cheia (máx. 15 cores).", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
             };
             panelFuncoes.Controls.Add(btnAddColor);
+
+            // Painel indicador da cor do botão esquerdo
+            panelLeftColor = new Panel
+            {
+                Width = 30,
+                Height = 30,
+                Left = btnAddColor.Right + 5,
+                Top = btnAddColor.Top,
+                BackColor = currentColor,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            panelFuncoes.Controls.Add(panelLeftColor);
+
+            // Painel indicador da cor do botão direito
+            panelRightColor = new Panel
+            {
+                Width = 30,
+                Height = 30,
+                Left = panelLeftColor.Right + 5,
+                Top = btnAddColor.Top,
+                BackColor = secondaryColor,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            panelFuncoes.Controls.Add(panelRightColor);
         }
+
+        // Atualiza os painéis de cor
+        private void AtualizarIndicadoresDeCor()
+        {
+            if (panelLeftColor != null) panelLeftColor.BackColor = currentColor;
+            if (panelRightColor != null) panelRightColor.BackColor = secondaryColor;
+        }
+
 
         private void AtualizarPaleta()
         {
@@ -252,6 +294,8 @@ namespace PixelArt
             if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
                 return;
 
+            mouseButtonInUse = e.Button; // guarda botão usado
+
             if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
             {
                 startPoint = new Point(x, y);
@@ -261,9 +305,11 @@ namespace PixelArt
             else
             {
                 isDrawing = true;
-                AplicarFerramenta(e.X, e.Y);
+                AplicarFerramenta(e.X, e.Y, e.Button);
             }
         }
+
+
 
         private void PictureBoxCanvas_MouseMove(object sender, MouseEventArgs e)
         {
@@ -278,8 +324,10 @@ namespace PixelArt
             if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
                 pictureBoxCanvas.Invalidate(); // Atualiza preview
             else
-                AplicarFerramenta(e.X, e.Y);
+                AplicarFerramenta(e.X, e.Y, mouseButtonInUse); // usa o botão que iniciou o desenho
         }
+
+
 
         private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
         {
@@ -300,7 +348,7 @@ namespace PixelArt
 
 
 
-        private void AplicarFerramenta(int mouseX, int mouseY)
+        private void AplicarFerramenta(int mouseX, int mouseY, MouseButtons botao)
         {
             int x = mouseX / pixelSize;
             int y = mouseY / pixelSize;
@@ -308,21 +356,25 @@ namespace PixelArt
             if (x < 0 || x >= canvasBitmap.Width || y < 0 || y >= canvasBitmap.Height)
                 return;
 
+            Color corUsar = botao == MouseButtons.Left ? currentColor : secondaryColor;
+
             switch (currentTool)
             {
                 case "Pencil":
-                    canvasBitmap.SetPixel(x, y, currentColor);
+                    canvasBitmap.SetPixel(x, y, corUsar);
                     break;
                 case "Eraser":
                     canvasBitmap.SetPixel(x, y, Color.White);
                     break;
                 case "Bucket":
-                    FloodFill(x, y, canvasBitmap.GetPixel(x, y), currentColor);
+                    FloodFill(x, y, canvasBitmap.GetPixel(x, y), corUsar);
                     break;
             }
 
             pictureBoxCanvas.Invalidate(new Rectangle(x * pixelSize, y * pixelSize, pixelSize, pixelSize));
         }
+
+
 
         private void PictureBoxCanvas_Paint(object sender, PaintEventArgs e)
         {
@@ -511,6 +563,7 @@ namespace PixelArt
             if (startPoint == null) return null;
 
             Bitmap preview = (Bitmap)canvasBitmap.Clone();
+            Color corUsar = mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor;
 
             int x = Math.Min(startPoint.Value.X, currentPoint.X);
             int y = Math.Min(startPoint.Value.Y, currentPoint.Y);
@@ -519,15 +572,11 @@ namespace PixelArt
 
             using (Graphics g = Graphics.FromImage(preview))
             {
-                Pen pen = new Pen(currentColor);
+                Pen pen = new Pen(corUsar);
                 if (currentTool == "Rectangle")
-                {
                     g.DrawRectangle(pen, x, y, w, h);
-                }
                 else if (currentTool == "Circle")
-                {
                     g.DrawEllipse(pen, x, y, w, h);
-                }
             }
 
             return preview;
@@ -535,9 +584,11 @@ namespace PixelArt
 
         private void DesenharFormaFinal(Point p1, Point p2)
         {
+            Color corUsar = mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor;
+
             using (Graphics g = Graphics.FromImage(canvasBitmap))
             {
-                Pen pen = new Pen(currentColor);
+                Pen pen = new Pen(corUsar);
                 int x = Math.Min(p1.X, p2.X);
                 int y = Math.Min(p1.Y, p2.Y);
                 int w = Math.Abs(p2.X - p1.X);
@@ -552,11 +603,12 @@ namespace PixelArt
                         g.DrawEllipse(pen, x, y, w, h);
                         break;
                     case "Line":
-                        DesenharLinhaBresenham(p1.X, p1.Y, p2.X, p2.Y, currentColor);
+                        DesenharLinhaBresenham(p1.X, p1.Y, p2.X, p2.Y, corUsar);
                         break;
                 }
             }
         }
+
         private void DesenharLinhaBresenham(int x0, int y0, int x1, int y1, Color color)
         {
             int dx = Math.Abs(x1 - x0);
