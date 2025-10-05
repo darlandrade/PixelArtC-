@@ -64,7 +64,7 @@ namespace PixelArt
                 BackColor = Color.LightGray,
                 Padding = new Padding(10),
                 AutoScroll = true
-            };            
+            };
             Controls.Add(panelFuncoes);
 
             // Painel inferior - Rodapé
@@ -253,7 +253,7 @@ namespace PixelArt
                     }
                     else
                     {
-                        btn.BackColor = Color.White;
+                        btn.BackColor = Color.LightGray; // indica que não há cor
                         btn.Enabled = false;
                     }
                     i++;
@@ -391,9 +391,11 @@ namespace PixelArt
             // --- Preview de formas (pixel-perfect) ---
             if (isDrawing && startPoint != null)
             {
+                Color corPreview = mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor;
+
                 if (currentTool == "Rectangle" || currentTool == "Circle")
                 {
-                    Bitmap preview = GerarPreviewForma();
+                    Bitmap preview = GerarPreviewForma(corPreview);
                     if (preview != null)
                     {
                         for (int i = 0; i < preview.Width; i++)
@@ -411,11 +413,12 @@ namespace PixelArt
                     List<Point> pixels = ObterPixelsLinhaBresenham(startPoint.Value.X, startPoint.Value.Y, currentPoint.X, currentPoint.Y);
                     foreach (var p in pixels)
                     {
-                        using (Brush b = new SolidBrush(currentColor))
+                        using (Brush b = new SolidBrush(corPreview))
                             e.Graphics.FillRectangle(b, p.X * pixelSize, p.Y * pixelSize, pixelSize, pixelSize);
                     }
                 }
             }
+
 
 
             // --- Grid ---
@@ -558,12 +561,11 @@ namespace PixelArt
             pictureBoxCanvas.Invalidate();
         }
 
-        private Bitmap GerarPreviewForma()
+        private Bitmap GerarPreviewForma(Color corPreview)
         {
             if (startPoint == null) return null;
 
             Bitmap preview = (Bitmap)canvasBitmap.Clone();
-            Color corUsar = mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor;
 
             int x = Math.Min(startPoint.Value.X, currentPoint.X);
             int y = Math.Min(startPoint.Value.Y, currentPoint.Y);
@@ -572,7 +574,7 @@ namespace PixelArt
 
             using (Graphics g = Graphics.FromImage(preview))
             {
-                Pen pen = new Pen(corUsar);
+                Pen pen = new Pen(corPreview);
                 if (currentTool == "Rectangle")
                     g.DrawRectangle(pen, x, y, w, h);
                 else if (currentTool == "Circle")
@@ -581,6 +583,7 @@ namespace PixelArt
 
             return preview;
         }
+
 
         private void DesenharFormaFinal(Point p1, Point p2)
         {
