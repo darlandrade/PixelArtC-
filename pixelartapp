@@ -59,15 +59,57 @@ namespace PixelArt
             {
                 Rectangle screen = Screen.PrimaryScreen.WorkingArea;
                 this.Width = (int)(screen.Width * 0.9);
-                this.Height = (int)(screen.Height * 0.9);
+                this.Height = (int)(screen.Height * 0.95);
 
                 // Centraliza
                 this.Left = (screen.Width - this.Width) / 2;
                 this.Top = (screen.Height - this.Height) / 2;
             };
+
+            panelCanvas.MouseWheel += PanelCanvas_MouseWheel;
+            panelCanvas.Focus();
+            panelCanvas.MouseEnter += (s, e) => panelCanvas.Focus();
+
+
+        }
+        private void PanelCanvas_MouseWheel(object sender, MouseEventArgs e)
+        {
+            float zoomFactor = 1.1f;
+            if (e.Delta < 0) zoomFactor = 1 / zoomFactor;
+
+            AjustarZoomFluido(zoomFactor);
         }
 
+        private void AjustarZoomFluido(float factor)
+        {
+            // novo pixelSize como float
+            float novoPixelSize = pixelSize * factor;
 
+            // limites
+            float minPixel = 4f;
+
+            // calcula máximo baseado em 90% do painel
+            int maxWidthPixel = (int)((panelCanvas.Width * 0.9) / canvasBitmap.Width);
+            int maxHeightPixel = (int)((panelCanvas.Height * 0.9) / canvasBitmap.Height);
+            float maxPixel = Math.Min(maxWidthPixel, maxHeightPixel);
+
+            // garante que não ultrapasse limites
+            if (novoPixelSize < minPixel) novoPixelSize = minPixel;
+            if (novoPixelSize > maxPixel) novoPixelSize = maxPixel;
+
+            // aplica somente depois de limitar
+            pixelSize = (int)Math.Round(novoPixelSize);
+
+            // atualiza tamanho do PictureBox
+            pictureBoxCanvas.Width = canvasBitmap.Width * pixelSize;
+            pictureBoxCanvas.Height = canvasBitmap.Height * pixelSize;
+
+            // centraliza
+            pictureBoxCanvas.Left = (panelCanvas.Width - pictureBoxCanvas.Width) / 2;
+            pictureBoxCanvas.Top = (panelCanvas.Height - pictureBoxCanvas.Height) / 2;
+
+            pictureBoxCanvas.Invalidate();
+        }
 
         private void CriarLayout()
         {
@@ -631,12 +673,6 @@ namespace PixelArt
 
                 else if (e.Control && e.KeyCode == Keys.Z)
                     LimparCanvas();
-
-                else if (e.KeyCode == Keys.Oemplus || e.KeyCode == Keys.Add)
-                    AjustarZoom(2);
-
-                else if (e.KeyCode == Keys.OemMinus || e.KeyCode == Keys.Subtract)
-                    AjustarZoom(-2);
             };
         }
 
@@ -661,28 +697,6 @@ namespace PixelArt
         {
             using (Graphics g = Graphics.FromImage(canvasBitmap))
                 g.Clear(Color.White);
-            pictureBoxCanvas.Invalidate();
-        }
-
-        // Ajuste do zoom mantendo o canvas centralizado
-        private void AjustarZoom(int delta)
-        {
-            // Calcula o pixelSize máximo baseado em 90% do painel
-            int maxWidthPixel = (int)((panelCanvas.Width * 0.9) / canvasBitmap.Width);
-            int maxHeightPixel = (int)((panelCanvas.Height * 0.9) / canvasBitmap.Height);
-            int maxPixelSize = Math.Min(maxWidthPixel, maxHeightPixel);
-
-            // Atualiza o pixelSize dentro do limite mínimo e máximo
-            pixelSize = Math.Max(4, Math.Min(maxPixelSize, pixelSize + delta));
-
-            // Atualiza o tamanho do PictureBox
-            pictureBoxCanvas.Width = canvasBitmap.Width * pixelSize;
-            pictureBoxCanvas.Height = canvasBitmap.Height * pixelSize;
-
-            // Re-centraliza o canvas
-            pictureBoxCanvas.Left = (panelCanvas.Width - pictureBoxCanvas.Width) / 2;
-            pictureBoxCanvas.Top = (panelCanvas.Height - pictureBoxCanvas.Height) / 2;
-
             pictureBoxCanvas.Invalidate();
         }
 
