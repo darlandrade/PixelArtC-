@@ -1,0 +1,594 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Windows.Forms;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+
+namespace PixelArt
+{
+    public partial class Form1 : Form
+    {
+        private Panel panelFerramentas;
+        private Panel panelCanvas;
+        private Panel panelFuncoes;
+        private Panel panelRodape;
+        private PictureBox pictureBoxCanvas;
+
+        private Bitmap canvasBitmap;
+        private Color currentColor = Color.Black;
+        private int pixelSize = 20;
+        private bool isDrawing = false;
+        private string currentTool = "Pencil"; // Lápis, Borracha, Balde
+        // --- Variáveis para formas ---
+        private Point? startPoint = null;   // ponto inicial do clique
+        private Point currentPoint;         // posição atual do mouse
+        private Bitmap previewBitmap;       // para desenhar preview temporário
+
+
+        private List<Color> paletteColors = new List<Color>
+        {
+            Color.Black, Color.Red, Color.Green, Color.Blue, Color.Yellow
+        };
+
+        public Form1()
+        {
+            InitializeComponent();
+            CriarLayout();
+            InicializarCanvas();
+            CriarFerramentas();
+            CriarFuncoes();
+            CriarRodape();
+            ConfigurarAtalhos();
+        }
+
+        private void CriarLayout()
+        {
+            // Painel esquerdo - Ferramentas
+            panelFerramentas = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 120,
+                BackColor = Color.LightGray
+            };
+            Controls.Add(panelFerramentas);
+
+            // Painel direito - Funções (paleta)
+            panelFuncoes = new Panel
+            {
+                Dock = DockStyle.Right,
+                Width = 200,
+                BackColor = Color.LightGray,
+                Padding = new Padding(10),
+                AutoScroll = true
+            };            
+            Controls.Add(panelFuncoes);
+
+            // Painel inferior - Rodapé
+            panelRodape = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 50,
+                BackColor = Color.LightGray,
+                Padding = new Padding(10)
+            };
+            Controls.Add(panelRodape);
+
+            // Painel central - Canvas
+            panelCanvas = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White
+            };
+            Controls.Add(panelCanvas);
+
+            // PictureBox do Canvas
+            pictureBoxCanvas = new PictureBox
+            {
+                Dock = DockStyle.Fill,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            panelCanvas.Controls.Add(pictureBoxCanvas);
+        }
+
+        private void InicializarCanvas()
+        {
+            canvasBitmap = new Bitmap(32, 32);
+            pictureBoxCanvas.Image = canvasBitmap;
+
+            pictureBoxCanvas.MouseDown += PictureBoxCanvas_MouseDown;
+            pictureBoxCanvas.MouseMove += PictureBoxCanvas_MouseMove;
+            pictureBoxCanvas.MouseUp += PictureBoxCanvas_MouseUp;
+            pictureBoxCanvas.Paint += PictureBoxCanvas_Paint;
+        }
+
+        private void CriarFerramentas()
+        {
+            int top = 20;
+
+            Button btnPencil = new Button { Text = "Lápis", Left = 10, Top = top, Width = 100 };
+            btnPencil.Click += (s, e) => currentTool = "Pencil";
+            panelFerramentas.Controls.Add(btnPencil);
+
+            Button btnEraser = new Button { Text = "Borracha", Left = 10, Top = top + 40, Width = 100 };
+            btnEraser.Click += (s, e) => currentTool = "Eraser";
+            panelFerramentas.Controls.Add(btnEraser);
+
+            Button btnBucket = new Button { Text = "Balde", Left = 10, Top = top + 80, Width = 100 };
+            btnBucket.Click += (s, e) => currentTool = "Bucket";
+            panelFerramentas.Controls.Add(btnBucket);
+
+            Button btnRectangle = new Button { Text = "Retângulo", Left = 10, Top = top + 120, Width = 100 };
+            btnRectangle.Click += (s, e) => currentTool = "Rectangle";
+            panelFerramentas.Controls.Add(btnRectangle);
+
+            Button btnCircle = new Button { Text = "Círculo", Left = 10, Top = top + 160, Width = 100 };
+            btnCircle.Click += (s, e) => currentTool = "Circle";
+            panelFerramentas.Controls.Add(btnCircle);
+
+            Button btnLine = new Button { Text = "Linha", Left = 10, Top = top + 180, Width = 100 };
+            btnLine.Click += (s, e) => currentTool = "Line";
+            panelFerramentas.Controls.Add(btnLine);
+
+
+        }
+
+        private void CriarFuncoes()
+        {
+            Label lblPaleta = new Label
+            {
+                Text = "Paleta de Cores",
+                Left = 10,
+                Top = 10,
+                Width = 150,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold)
+            };
+            panelFuncoes.Controls.Add(lblPaleta);
+
+            int btnSize = 30;
+            int margem = 5;
+            int inicioY = lblPaleta.Bottom + 15;
+
+            // Limita espaço para até 15 cores
+            for (int i = 0; i < 15; i++)
+            {
+                Button colorBtn = new Button
+                {
+                    Width = btnSize,
+                    Height = btnSize,
+                    Left = 10 + (i % 5) * (btnSize + margem),
+                    Top = inicioY + (i / 5) * (btnSize + margem),
+                    BackColor = i < paletteColors.Count ? paletteColors[i] : Color.White,
+                    Enabled = i < paletteColors.Count,  // <-- nova linha
+                    FlatStyle = FlatStyle.Flat
+                };
+
+                colorBtn.Click += (s, e) => currentColor = colorBtn.BackColor;
+                panelFuncoes.Controls.Add(colorBtn);
+            }
+
+
+            Button btnAddColor = new Button
+            {
+                Text = "+",
+                Width = 30,
+                Height = 30,
+                Left = 10,
+                Top = inicioY + 3 * (btnSize + margem) + 10
+            };
+            btnAddColor.Click += (s, e) =>
+            {
+                if (paletteColors.Count < 15)
+                {
+                    using (ColorDialog cd = new ColorDialog())
+                    {
+                        if (cd.ShowDialog() == DialogResult.OK)
+                        {
+                            paletteColors.Add(cd.Color);
+                            AtualizarPaleta();
+                        }
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("A paleta está cheia (máx. 15 cores).", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            };
+            panelFuncoes.Controls.Add(btnAddColor);
+        }
+
+        private void AtualizarPaleta()
+        {
+            int i = 0;
+            foreach (Control c in panelFuncoes.Controls)
+            {
+                if (c is Button btn && btn.Text == "")
+                {
+                    if (i < paletteColors.Count)
+                    {
+                        btn.BackColor = paletteColors[i];
+                        btn.Enabled = true;
+                    }
+                    else
+                    {
+                        btn.BackColor = Color.White;
+                        btn.Enabled = false;
+                    }
+                    i++;
+                }
+            }
+        }
+
+
+        private void CriarRodape()
+        {
+            Button btnExportar = new Button
+            {
+                Text = "Exportar PNG",
+                Width = 120,
+                Height = 30,
+                Left = 10,
+                Top = 10
+            };
+            btnExportar.Click += (s, e) => ExportarPNG();
+            panelRodape.Controls.Add(btnExportar);
+        }
+
+        private void ExportarPNG()
+        {
+            using (SaveFileDialog sfd = new SaveFileDialog())
+            {
+                sfd.Filter = "PNG Image|*.png";
+                if (sfd.ShowDialog() == DialogResult.OK)
+                    canvasBitmap.Save(sfd.FileName, System.Drawing.Imaging.ImageFormat.Png);
+            }
+        }
+
+        private void PictureBoxCanvas_MouseDown(object sender, MouseEventArgs e)
+        {
+            int x = e.X / pixelSize;
+            int y = e.Y / pixelSize;
+
+            if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
+                return;
+
+            if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
+            {
+                startPoint = new Point(x, y);
+                currentPoint = startPoint.Value;
+                isDrawing = true;
+            }
+            else
+            {
+                isDrawing = true;
+                AplicarFerramenta(e.X, e.Y);
+            }
+        }
+
+        private void PictureBoxCanvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!isDrawing) return;
+
+            int x = e.X / pixelSize;
+            int y = e.Y / pixelSize;
+            if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
+                return;
+
+            currentPoint = new Point(x, y);
+            if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
+                pictureBoxCanvas.Invalidate(); // Atualiza preview
+            else
+                AplicarFerramenta(e.X, e.Y);
+        }
+
+        private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (!isDrawing) return;
+
+            int x = e.X / pixelSize;
+            int y = e.Y / pixelSize;
+
+            if (startPoint != null && (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line"))
+            {
+                DesenharFormaFinal(startPoint.Value, new Point(x, y));
+                startPoint = null;
+            }
+
+            isDrawing = false;
+            pictureBoxCanvas.Invalidate();
+        }
+
+
+
+        private void AplicarFerramenta(int mouseX, int mouseY)
+        {
+            int x = mouseX / pixelSize;
+            int y = mouseY / pixelSize;
+
+            if (x < 0 || x >= canvasBitmap.Width || y < 0 || y >= canvasBitmap.Height)
+                return;
+
+            switch (currentTool)
+            {
+                case "Pencil":
+                    canvasBitmap.SetPixel(x, y, currentColor);
+                    break;
+                case "Eraser":
+                    canvasBitmap.SetPixel(x, y, Color.White);
+                    break;
+                case "Bucket":
+                    FloodFill(x, y, canvasBitmap.GetPixel(x, y), currentColor);
+                    break;
+            }
+
+            pictureBoxCanvas.Invalidate(new Rectangle(x * pixelSize, y * pixelSize, pixelSize, pixelSize));
+        }
+
+        private void PictureBoxCanvas_Paint(object sender, PaintEventArgs e)
+        {
+            for (int i = 0; i < canvasBitmap.Width; i++)
+            {
+                for (int j = 0; j < canvasBitmap.Height; j++)
+                {
+                    using (Brush b = new SolidBrush(canvasBitmap.GetPixel(i, j)))
+                        e.Graphics.FillRectangle(b, i * pixelSize, j * pixelSize, pixelSize, pixelSize);
+                }
+            }
+
+            // --- Preview de formas ---
+            // --- Preview de formas (pixel-perfect) ---
+            if (isDrawing && startPoint != null)
+            {
+                if (currentTool == "Rectangle" || currentTool == "Circle")
+                {
+                    Bitmap preview = GerarPreviewForma();
+                    if (preview != null)
+                    {
+                        for (int i = 0; i < preview.Width; i++)
+                        {
+                            for (int j = 0; j < preview.Height; j++)
+                            {
+                                using (Brush b = new SolidBrush(preview.GetPixel(i, j)))
+                                    e.Graphics.FillRectangle(b, i * pixelSize, j * pixelSize, pixelSize, pixelSize);
+                            }
+                        }
+                    }
+                }
+                else if (currentTool == "Line")
+                {
+                    List<Point> pixels = ObterPixelsLinhaBresenham(startPoint.Value.X, startPoint.Value.Y, currentPoint.X, currentPoint.Y);
+                    foreach (var p in pixels)
+                    {
+                        using (Brush b = new SolidBrush(currentColor))
+                            e.Graphics.FillRectangle(b, p.X * pixelSize, p.Y * pixelSize, pixelSize, pixelSize);
+                    }
+                }
+            }
+
+
+            // --- Grid ---
+            Pen gridPen = new Pen(Color.FromArgb(40, 0, 0, 0)); // Grid semi-transparente
+            for (int i = 0; i <= canvasBitmap.Width; i++)
+                e.Graphics.DrawLine(gridPen, i * pixelSize, 0, i * pixelSize, canvasBitmap.Height * pixelSize);
+            for (int j = 0; j <= canvasBitmap.Height; j++)
+                e.Graphics.DrawLine(gridPen, 0, j * pixelSize, canvasBitmap.Width * pixelSize, j * pixelSize);
+        }
+
+        private List<Point> ObterPixelsLinhaBresenham(int x0, int y0, int x1, int y1)
+        {
+            List<Point> pixels = new List<Point>();
+            int dx = Math.Abs(x1 - x0);
+            int dy = Math.Abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1;
+            int sy = y0 < y1 ? 1 : -1;
+            int err = dx - dy;
+
+            while (true)
+            {
+                pixels.Add(new Point(x0, y0));
+                if (x0 == x1 && y0 == y1)
+                    break;
+                int e2 = 2 * err;
+                if (e2 > -dy)
+                {
+                    err -= dy;
+                    x0 += sx;
+                }
+                if (e2 < dx)
+                {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+
+            return pixels;
+        }
+
+        // Substitua apenas este método no seu código atual:
+        private void FloodFill(int x, int y, Color targetColor, Color replacementColor)
+        {
+            if (targetColor.ToArgb() == replacementColor.ToArgb())
+                return;
+
+            Rectangle rect = new Rectangle(0, 0, canvasBitmap.Width, canvasBitmap.Height);
+            BitmapData data = canvasBitmap.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+            int bytes = Math.Abs(data.Stride) * data.Height;
+            byte[] buffer = new byte[bytes];
+            Marshal.Copy(data.Scan0, buffer, 0, bytes);
+
+            int GetIndex(int px, int py) => (py * data.Stride) + (px * 4);
+            int target = targetColor.ToArgb();
+
+            Queue<Point> queue = new Queue<Point>();
+            queue.Enqueue(new Point(x, y));
+
+            while (queue.Count > 0)
+            {
+                Point p = queue.Dequeue();
+                if (p.X < 0 || p.Y < 0 || p.X >= canvasBitmap.Width || p.Y >= canvasBitmap.Height)
+                    continue;
+
+                int index = GetIndex(p.X, p.Y);
+                int color =
+                    buffer[index] |
+                    (buffer[index + 1] << 8) |
+                    (buffer[index + 2] << 16) |
+                    (buffer[index + 3] << 24);
+
+                if (color != target)
+                    continue;
+
+                // Define a nova cor
+                buffer[index] = replacementColor.B;
+                buffer[index + 1] = replacementColor.G;
+                buffer[index + 2] = replacementColor.R;
+                buffer[index + 3] = replacementColor.A;
+
+                // Enfileira os 4 vizinhos
+                queue.Enqueue(new Point(p.X + 1, p.Y));
+                queue.Enqueue(new Point(p.X - 1, p.Y));
+                queue.Enqueue(new Point(p.X, p.Y + 1));
+                queue.Enqueue(new Point(p.X, p.Y - 1));
+            }
+
+            Marshal.Copy(buffer, 0, data.Scan0, bytes);
+            canvasBitmap.UnlockBits(data);
+            pictureBoxCanvas.Invalidate();
+        }
+
+        private void ConfigurarAtalhos()
+        {
+            KeyPreview = true;
+            KeyDown += (s, e) =>
+            {
+                if (e.Control && e.KeyCode == Keys.S)
+                    ExportarPNG();
+
+                else if (e.Control && e.KeyCode == Keys.Z)
+                    LimparCanvas();
+
+                else if (e.KeyCode == Keys.Oemplus || e.KeyCode == Keys.Add)
+                    AjustarZoom(2);
+
+                else if (e.KeyCode == Keys.OemMinus || e.KeyCode == Keys.Subtract)
+                    AjustarZoom(-2);
+            };
+        }
+
+        private void DesenharForma(Point p1, Point p2)
+        {
+            int x = Math.Min(p1.X, p2.X);
+            int y = Math.Min(p1.Y, p2.Y);
+            int w = Math.Abs(p2.X - p1.X);
+            int h = Math.Abs(p2.Y - p1.Y);
+
+            using (Graphics g = Graphics.FromImage(canvasBitmap))
+            {
+                Pen pen = new Pen(currentColor, 1);
+                if (currentTool == "Rectangle")
+                    g.DrawRectangle(pen, x, y, w, h);
+                else if (currentTool == "Circle")
+                    g.DrawEllipse(pen, x, y, w, h);
+            }
+        }
+
+
+        private void LimparCanvas()
+        {
+            using (Graphics g = Graphics.FromImage(canvasBitmap))
+                g.Clear(Color.White);
+            pictureBoxCanvas.Invalidate();
+        }
+
+        private void AjustarZoom(int delta)
+        {
+            pixelSize = Math.Max(4, Math.Min(50, pixelSize + delta));
+            pictureBoxCanvas.Invalidate();
+        }
+
+        private Bitmap GerarPreviewForma()
+        {
+            if (startPoint == null) return null;
+
+            Bitmap preview = (Bitmap)canvasBitmap.Clone();
+
+            int x = Math.Min(startPoint.Value.X, currentPoint.X);
+            int y = Math.Min(startPoint.Value.Y, currentPoint.Y);
+            int w = Math.Abs(currentPoint.X - startPoint.Value.X);
+            int h = Math.Abs(currentPoint.Y - startPoint.Value.Y);
+
+            using (Graphics g = Graphics.FromImage(preview))
+            {
+                Pen pen = new Pen(currentColor);
+                if (currentTool == "Rectangle")
+                {
+                    g.DrawRectangle(pen, x, y, w, h);
+                }
+                else if (currentTool == "Circle")
+                {
+                    g.DrawEllipse(pen, x, y, w, h);
+                }
+            }
+
+            return preview;
+        }
+
+        private void DesenharFormaFinal(Point p1, Point p2)
+        {
+            using (Graphics g = Graphics.FromImage(canvasBitmap))
+            {
+                Pen pen = new Pen(currentColor);
+                int x = Math.Min(p1.X, p2.X);
+                int y = Math.Min(p1.Y, p2.Y);
+                int w = Math.Abs(p2.X - p1.X);
+                int h = Math.Abs(p2.Y - p1.Y);
+
+                switch (currentTool)
+                {
+                    case "Rectangle":
+                        g.DrawRectangle(pen, x, y, w, h);
+                        break;
+                    case "Circle":
+                        g.DrawEllipse(pen, x, y, w, h);
+                        break;
+                    case "Line":
+                        DesenharLinhaBresenham(p1.X, p1.Y, p2.X, p2.Y, currentColor);
+                        break;
+                }
+            }
+        }
+        private void DesenharLinhaBresenham(int x0, int y0, int x1, int y1, Color color)
+        {
+            int dx = Math.Abs(x1 - x0);
+            int dy = Math.Abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1;
+            int sy = y0 < y1 ? 1 : -1;
+            int err = dx - dy;
+
+            while (true)
+            {
+                if (x0 >= 0 && y0 >= 0 && x0 < canvasBitmap.Width && y0 < canvasBitmap.Height)
+                    canvasBitmap.SetPixel(x0, y0, color);
+
+                if (x0 == x1 && y0 == y1)
+                    break;
+
+                int e2 = 2 * err;
+                if (e2 > -dy)
+                {
+                    err -= dy;
+                    x0 += sx;
+                }
+                if (e2 < dx)
+                {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+        }
+
+
+    }
+
+
+}
