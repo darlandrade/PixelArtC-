@@ -23,18 +23,15 @@ namespace PixelArt
         // --- Variáveis para formas ---
         private Point? startPoint = null;   // ponto inicial do clique
         private Point currentPoint;         // posição atual do mouse
-        
+
         private MouseButtons mouseButtonInUse; // Botão que iniciou o desenho
-        private Color secondaryColor = Color.White; // Cor do botão direito
+        private Color secondaryColor = Color.Chartreuse; // Cor do botão direito
 
         // Espelho
         private string mirrorMode = "None"; // "None", "H", "V", "HV"
         private Button btnMirrorH;
         private Button btnMirrorV;
         private Button btnMirrorHV;
-
-
-
 
         private List<Color> paletteColors = new List<Color>
         {
@@ -69,7 +66,6 @@ namespace PixelArt
             panelCanvas.MouseWheel += PanelCanvas_MouseWheel;
             panelCanvas.Focus();
             panelCanvas.MouseEnter += (s, e) => panelCanvas.Focus();
-
 
         }
         private void PanelCanvas_MouseWheel(object sender, MouseEventArgs e)
@@ -257,7 +253,7 @@ namespace PixelArt
                     Height = btnSize,
                     Left = 10 + (i % 5) * (btnSize + margem),
                     Top = inicioY + (i / 5) * (btnSize + margem),
-                    BackColor = i < paletteColors.Count ? paletteColors[i] : Color.White,
+                    BackColor = i < paletteColors.Count ? paletteColors[i] : Color.Transparent,
                     Enabled = i < paletteColors.Count,
                     FlatStyle = FlatStyle.Flat
                 };
@@ -502,7 +498,7 @@ namespace PixelArt
                     DesenharComEspelho(x, y, corUsar);
                     break;
                 case "Eraser":
-                    DesenharComEspelho(x, y, Color.White);
+                    DesenharComEspelho(x, y, Color.Transparent);
                     break;
                 case "Bucket":
                     FloodFill(x, y, canvasBitmap.GetPixel(x, y), corUsar);
@@ -696,7 +692,7 @@ namespace PixelArt
         private void LimparCanvas()
         {
             using (Graphics g = Graphics.FromImage(canvasBitmap))
-                g.Clear(Color.White);
+                g.Clear(Color.Transparent);
             pictureBoxCanvas.Invalidate();
         }
 
