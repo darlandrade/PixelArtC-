@@ -129,7 +129,7 @@ namespace PixelArt
             btnCircle.Click += (s, e) => currentTool = "Circle";
             panelFerramentas.Controls.Add(btnCircle);
 
-            Button btnLine = new Button { Text = "Linha", Left = 10, Top = top + 180, Width = 100 };
+            Button btnLine = new Button { Text = "Linha", Left = 10, Top = top + 200, Width = 100 };
             btnLine.Click += (s, e) => currentTool = "Line";
             panelFerramentas.Controls.Add(btnLine);
 
