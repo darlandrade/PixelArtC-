@@ -27,6 +27,13 @@ namespace PixelArt
         private MouseButtons mouseButtonInUse; // Botão que iniciou o desenho
         private Color secondaryColor = Color.White; // Cor do botão direito
 
+        // Espelho
+        private string mirrorMode = "None"; // "None", "H", "V", "HV"
+        private Button btnMirrorH;
+        private Button btnMirrorV;
+        private Button btnMirrorHV;
+
+
 
 
         private List<Color> paletteColors = new List<Color>
@@ -43,7 +50,24 @@ namespace PixelArt
             CriarFuncoes();
             CriarRodape();
             ConfigurarAtalhos();
+
+            // Define que a janela será manualmente posicionada
+            this.StartPosition = FormStartPosition.Manual;
+
+            // Ajusta o tamanho inicial para 90% da tela e centraliza
+            this.Load += (s, e) =>
+            {
+                Rectangle screen = Screen.PrimaryScreen.WorkingArea;
+                this.Width = (int)(screen.Width * 0.9);
+                this.Height = (int)(screen.Height * 0.9);
+
+                // Centraliza
+                this.Left = (screen.Width - this.Width) / 2;
+                this.Top = (screen.Height - this.Height) / 2;
+            };
         }
+
+
 
         private void CriarLayout()
         {
@@ -81,17 +105,21 @@ namespace PixelArt
             panelCanvas = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.White
+                BackColor = Color.Gray, // dá contraste para ver o canvas
+                AutoScroll = true
             };
             Controls.Add(panelCanvas);
 
             // PictureBox do Canvas
             pictureBoxCanvas = new PictureBox
             {
-                Dock = DockStyle.Fill,
-                BorderStyle = BorderStyle.FixedSingle
+                BorderStyle = BorderStyle.FixedSingle,
+                SizeMode = PictureBoxSizeMode.Normal
             };
             panelCanvas.Controls.Add(pictureBoxCanvas);
+
+            // Ajusta o PictureBox quando o painel mudar de tamanho
+            panelCanvas.Resize += (s, e) => CentralizarCanvas();
         }
 
         private void InicializarCanvas()
@@ -99,12 +127,37 @@ namespace PixelArt
             canvasBitmap = new Bitmap(32, 32);
             pictureBoxCanvas.Image = canvasBitmap;
 
+            // Ajusta para não ocupar todo o painel, para podermos centralizar
+            pictureBoxCanvas.SizeMode = PictureBoxSizeMode.Normal;
+            pictureBoxCanvas.Width = canvasBitmap.Width * pixelSize;
+            pictureBoxCanvas.Height = canvasBitmap.Height * pixelSize;
+
+            // Centraliza dentro do painel
+            pictureBoxCanvas.Left = (panelCanvas.Width - pictureBoxCanvas.Width) / 2;
+            pictureBoxCanvas.Top = (panelCanvas.Height - pictureBoxCanvas.Height) / 2;
+
+            // Faz o canvas reagir ao redimensionamento do painel
+            panelCanvas.Resize += (s, e) =>
+            {
+                pictureBoxCanvas.Left = (panelCanvas.Width - pictureBoxCanvas.Width) / 2;
+                pictureBoxCanvas.Top = (panelCanvas.Height - pictureBoxCanvas.Height) / 2;
+            };
+
             pictureBoxCanvas.MouseDown += PictureBoxCanvas_MouseDown;
             pictureBoxCanvas.MouseMove += PictureBoxCanvas_MouseMove;
             pictureBoxCanvas.MouseUp += PictureBoxCanvas_MouseUp;
             pictureBoxCanvas.Paint += PictureBoxCanvas_Paint;
         }
 
+
+        // Centraliza o PictureBox no painelCanvas
+        private void CentralizarCanvas()
+        {
+            if (pictureBoxCanvas == null || panelCanvas == null) return;
+
+            pictureBoxCanvas.Left = Math.Max((panelCanvas.Width - pictureBoxCanvas.Width) / 2, 0);
+            pictureBoxCanvas.Top = Math.Max((panelCanvas.Height - pictureBoxCanvas.Height) / 2, 0);
+        }
         private void CriarFerramentas()
         {
             int top = 20;
@@ -228,6 +281,45 @@ namespace PixelArt
                 BorderStyle = BorderStyle.FixedSingle
             };
             panelFuncoes.Controls.Add(panelRightColor);
+
+            int mirrorTop = btnAddColor.Bottom + 10;
+
+            btnMirrorH = new Button
+            {
+                Text = "H",
+                Width = 30,
+                Height = 30,
+                Left = 10,
+                Top = mirrorTop,
+                BackColor = Color.LightGray
+            };
+            btnMirrorH.Click += (s, e) => AtivarEspelho("H");
+            panelFuncoes.Controls.Add(btnMirrorH);
+
+            btnMirrorV = new Button
+            {
+                Text = "V",
+                Width = 30,
+                Height = 30,
+                Left = btnMirrorH.Right + 5,
+                Top = mirrorTop,
+                BackColor = Color.LightGray
+            };
+            btnMirrorV.Click += (s, e) => AtivarEspelho("V");
+            panelFuncoes.Controls.Add(btnMirrorV);
+
+            btnMirrorHV = new Button
+            {
+                Text = "H+V",
+                Width = 45,
+                Height = 30,
+                Left = btnMirrorV.Right + 5,
+                Top = mirrorTop,
+                BackColor = Color.LightGray
+            };
+            btnMirrorHV.Click += (s, e) => AtivarEspelho("HV");
+            panelFuncoes.Controls.Add(btnMirrorHV);
+
         }
 
         // Atualiza os painéis de cor
@@ -257,6 +349,19 @@ namespace PixelArt
                     i++;
                 }
             }
+        }
+
+        private void AtivarEspelho(string mode)
+        {
+            mirrorMode = mirrorMode == mode ? "None" : mode; // alterna ao clicar novamente
+            AtualizarBotoesEspelho();
+        }
+
+        private void AtualizarBotoesEspelho()
+        {
+            btnMirrorH.BackColor = mirrorMode == "H" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
+            btnMirrorV.BackColor = mirrorMode == "V" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
+            btnMirrorHV.BackColor = mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
         }
 
         private void CriarRodape()
@@ -352,10 +457,10 @@ namespace PixelArt
             switch (currentTool)
             {
                 case "Pencil":
-                    canvasBitmap.SetPixel(x, y, corUsar);
+                    DesenharComEspelho(x, y, corUsar);
                     break;
                 case "Eraser":
-                    canvasBitmap.SetPixel(x, y, Color.White);
+                    DesenharComEspelho(x, y, Color.White);
                     break;
                 case "Bucket":
                     FloodFill(x, y, canvasBitmap.GetPixel(x, y), corUsar);
@@ -363,6 +468,23 @@ namespace PixelArt
             }
 
             pictureBoxCanvas.Invalidate(new Rectangle(x * pixelSize, y * pixelSize, pixelSize, pixelSize));
+
+            void DesenharComEspelho(int x, int y, Color cor)
+            {
+                // Ponto original
+                canvasBitmap.SetPixel(x, y, cor);
+
+                int w = canvasBitmap.Width;
+                int h = canvasBitmap.Height;
+
+                if (mirrorMode == "H" || mirrorMode == "HV")
+                    canvasBitmap.SetPixel(w - 1 - x, y, cor);
+                if (mirrorMode == "V" || mirrorMode == "HV")
+                    canvasBitmap.SetPixel(x, h - 1 - y, cor);
+                if (mirrorMode == "HV")
+                    canvasBitmap.SetPixel(w - 1 - x, h - 1 - y, cor);
+            }
+
         }
 
         private void PictureBoxCanvas_Paint(object sender, PaintEventArgs e)
@@ -542,9 +664,25 @@ namespace PixelArt
             pictureBoxCanvas.Invalidate();
         }
 
+        // Ajuste do zoom mantendo o canvas centralizado
         private void AjustarZoom(int delta)
         {
-            pixelSize = Math.Max(4, Math.Min(50, pixelSize + delta));
+            // Calcula o pixelSize máximo baseado em 90% do painel
+            int maxWidthPixel = (int)((panelCanvas.Width * 0.9) / canvasBitmap.Width);
+            int maxHeightPixel = (int)((panelCanvas.Height * 0.9) / canvasBitmap.Height);
+            int maxPixelSize = Math.Min(maxWidthPixel, maxHeightPixel);
+
+            // Atualiza o pixelSize dentro do limite mínimo e máximo
+            pixelSize = Math.Max(4, Math.Min(maxPixelSize, pixelSize + delta));
+
+            // Atualiza o tamanho do PictureBox
+            pictureBoxCanvas.Width = canvasBitmap.Width * pixelSize;
+            pictureBoxCanvas.Height = canvasBitmap.Height * pixelSize;
+
+            // Re-centraliza o canvas
+            pictureBoxCanvas.Left = (panelCanvas.Width - pictureBoxCanvas.Width) / 2;
+            pictureBoxCanvas.Top = (panelCanvas.Height - pictureBoxCanvas.Height) / 2;
+
             pictureBoxCanvas.Invalidate();
         }
 
@@ -575,8 +713,6 @@ namespace PixelArt
 
             return preview;
         }
-
-
         private void DesenharFormaFinal(Point p1, Point p2)
         {
             Color corUsar = mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor;
