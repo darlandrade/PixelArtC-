@@ -427,68 +427,74 @@ namespace PixelArt
         }
 
         private void PictureBoxCanvas_MouseDown(object sender, MouseEventArgs e)
-{
-    int x = e.X / pixelSize;
-    int y = e.Y / pixelSize;
+        {
+            int x = e.X / pixelSize;
+            int y = e.Y / pixelSize;
 
-    if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
-        return;
+            if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
+                return;
 
-    mouseButtonInUse = e.Button;
-    isDrawing = true;
+            mouseButtonInUse = e.Button;
+            isDrawing = true;
 
-    IniciarAcao(); // Start a new undo action
+            IniciarAcao();
 
-    if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
-    {
-        startPoint = new Point(x, y);
-        currentPoint = startPoint.Value;
-    }
-    else
-    {
-        AplicarFerramenta(e.X, e.Y, e.Button);
-    }
+            if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
+            {
+                startPoint = new Point(x, y);
+                currentPoint = startPoint.Value;
+            }
+            else
+            {
+                lastPreviewPoint = new Point(x, y);
+                currentPoint = new Point(x, y);
+                AplicarFerramenta(e.X, e.Y, e.Button);
+                pictureBoxCanvas.Invalidate(); // Ensure immediate redraw
+            }
 }
 
-private void PictureBoxCanvas_MouseMove(object sender, MouseEventArgs e)
-{
-    int x = e.X / pixelSize;
-    int y = e.Y / pixelSize;
+        private void PictureBoxCanvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            int x = e.X / pixelSize;
+            int y = e.Y / pixelSize;
 
-    if (!isDrawing) return;
+            if (!isDrawing) return;
+            if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
+                return;
 
-    if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
-        return;
+            if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
+            {
+                currentPoint = new Point(x, y);
+                pictureBoxCanvas.Invalidate();
+            }
+            else
+            {
+                // For Pencil/Eraser, update preview line
+                currentPoint = new Point(x, y);
+                pictureBoxCanvas.Invalidate();
+                AplicarFerramenta(e.X, e.Y, mouseButtonInUse);
+                lastPreviewPoint = currentPoint;
+            }
+        }
 
-    currentPoint = new Point(x, y);
+        private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (!isDrawing) return;
 
-    if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
-    {
-        pictureBoxCanvas.Invalidate(); // Show preview
-    }
-    else
-    {
-        AplicarFerramenta(e.X, e.Y, mouseButtonInUse);
-    }
-}
+            int x = e.X / pixelSize;
+            int y = e.Y / pixelSize;
 
-private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
-{
-    if (!isDrawing) return;
+            if (startPoint != null && (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line"))
+            {
+                DesenharFormaFinal(startPoint.Value, new Point(x, y));
+                startPoint = null;
+            }
 
-    int x = e.X / pixelSize;
-    int y = e.Y / pixelSize;
-
-    if (startPoint != null && (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line"))
-    {
-        DesenharFormaFinal(startPoint.Value, new Point(x, y));
-        startPoint = null;
-    }
-
-    isDrawing = false;
-    FinalizarAcao(); // End the undo action
-    pictureBoxCanvas.Invalidate();
-}
+            isDrawing = false;
+            lastPreviewPoint = null;
+            FinalizarAcao();
+            pictureBoxCanvas.Invalidate();
+        }
 
         private void AplicarFerramenta(int mouseX, int mouseY, MouseButtons botao)
         {
@@ -568,14 +574,31 @@ private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
                 {
                     Color corUsar = mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor;
                     List<Point> pixels = ObterPixelsLinhaBresenham(startPoint.Value.X, startPoint.Value.Y, currentPoint.X, currentPoint.Y);
-                    foreach (var p in pixels)
+
+                    // Draw main line and all mirrors
+                    foreach (var p in GetMirroredPoints(pixels, canvasBitmap.Width, canvasBitmap.Height, mirrorMode))
                     {
-                        using (Brush b = new SolidBrush(Color.FromArgb(128, corUsar))) // 128 = 50% de transparência
+                        using (Brush b = new SolidBrush(Color.FromArgb(128, corUsar)))
                             e.Graphics.FillRectangle(b, p.X * pixelSize, p.Y * pixelSize, pixelSize, pixelSize);
                     }
                 }
-
             }
+            // Pencil/Eraser preview
+            else if (isDrawing && (currentTool == "Pencil" || currentTool == "Eraser") && lastPreviewPoint != null)
+{
+    Color corPreview = currentTool == "Eraser" ? Color.Transparent : (mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor);
+    var previewPixels = ObterPixelsLinhaBresenham(lastPreviewPoint.Value.X, lastPreviewPoint.Value.Y, currentPoint.X, currentPoint.Y);
+
+    foreach (var p in GetMirroredPoints(previewPixels, canvasBitmap.Width, canvasBitmap.Height, mirrorMode))
+    {
+        Color drawColor = corPreview == Color.Transparent
+            ? Color.FromArgb(80, 200, 200, 200)
+            : Color.FromArgb(120, corPreview.R, corPreview.G, corPreview.B);
+
+        using (Brush b = new SolidBrush(drawColor))
+            e.Graphics.FillRectangle(b, p.X * pixelSize, p.Y * pixelSize, pixelSize, pixelSize);
+    }
+}
 
             // --- Grid ---
             Pen gridPen = new Pen(Color.FromArgb(40, 0, 0, 0)); // Grid semi-transparente
@@ -583,6 +606,37 @@ private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
                 e.Graphics.DrawLine(gridPen, i * pixelSize, 0, i * pixelSize, canvasBitmap.Height * pixelSize);
             for (int j = 0; j <= canvasBitmap.Height; j++)
                 e.Graphics.DrawLine(gridPen, 0, j * pixelSize, canvasBitmap.Width * pixelSize, j * pixelSize);
+        }
+
+        // Helper for mirror preview
+        private IEnumerable<Point> GetMirroredPoints(IEnumerable<Point> basePoints, int w, int h, string mirrorMode)
+        {
+            HashSet<Point> result = new HashSet<Point>();
+            foreach (var p in basePoints)
+            {
+                if (p.X >= 0 && p.Y >= 0 && p.X < w && p.Y < h)
+                    result.Add(p);
+
+                if (mirrorMode == "H" || mirrorMode == "HV")
+                {
+                    var mp = new Point(w - 1 - p.X, p.Y);
+                    if (mp.X >= 0 && mp.Y >= 0 && mp.X < w && mp.Y < h)
+                        result.Add(mp);
+                }
+                if (mirrorMode == "V" || mirrorMode == "HV")
+                {
+                    var mp = new Point(p.X, h - 1 - p.Y);
+                    if (mp.X >= 0 && mp.Y >= 0 && mp.X < w && mp.Y < h)
+                        result.Add(mp);
+                }
+                if (mirrorMode == "HV")
+                {
+                    var mp = new Point(w - 1 - p.X, h - 1 - p.Y);
+                    if (mp.X >= 0 && mp.Y >= 0 && mp.X < w && mp.Y < h)
+                        result.Add(mp);
+                }
+            }
+            return result;
         }
 
         private List<Point> ObterPixelsLinhaBresenham(int x0, int y0, int x1, int y1)
@@ -932,6 +986,8 @@ private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
                 }
             }
         }
+
+        private Point? lastPreviewPoint = null;
     }
 
 }
