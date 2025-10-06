@@ -224,6 +224,13 @@ namespace PixelArt
             btnLine.Click += (s, e) => currentTool = "Line";
             panelFerramentas.Controls.Add(btnLine);
 
+            Button btnReplaceColor = new Button { Text = "Trocar Cor", Left = 10, Top = top + 240, Width = 100 };
+            btnReplaceColor.Click += (s, e) => currentTool = "ReplaceColor";
+            panelFerramentas.Controls.Add(btnReplaceColor);
+
+            Button btnColorPicker = new Button { Text = "Conta-gotas", Left = 10, Top = top + 280, Width = 100 };
+            btnColorPicker.Click += (s, e) => currentTool = "ColorPicker";
+            panelFerramentas.Controls.Add(btnColorPicker);
         }
 
         private Panel panelLeftColor;
@@ -552,6 +559,12 @@ namespace PixelArt
                 case "Bucket":
                     FloodFill(x, y, canvasBitmap.GetPixel(x, y), corUsar);
                     break;
+                case "ReplaceColor":
+                    ReplaceAllPixelsOfColor(canvasBitmap.GetPixel(x, y), corUsar);
+                    break;
+                case "ColorPicker":
+                    PickColorFromCanvas(x, y, botao);
+                    break;
             }
 
             pictureBoxCanvas.Invalidate(new Rectangle(x * pixelSize, y * pixelSize, pixelSize, pixelSize));
@@ -572,7 +585,36 @@ namespace PixelArt
                     RegistrarMudancaPixel(w - 1 - px, h - 1 - py, cor);
             }
         }
+        private void PickColorFromCanvas(int x, int y, MouseButtons botao)
+        {
+            Color picked = canvasBitmap.GetPixel(x, y);
+            if (botao == MouseButtons.Left)
+                currentColor = picked;
+            else if (botao == MouseButtons.Right)
+                secondaryColor = picked;
+            AtualizarIndicadoresDeCor();
+        }
+        private void ReplaceAllPixelsOfColor(Color targetColor, Color replacementColor)
+        {
+            if (targetColor.ToArgb() == replacementColor.ToArgb())
+                return;
 
+            IniciarAcao();
+
+            for (int i = 0; i < canvasBitmap.Width; i++)
+            {
+                for (int j = 0; j < canvasBitmap.Height; j++)
+                {
+                    if (canvasBitmap.GetPixel(i, j).ToArgb() == targetColor.ToArgb())
+                    {
+                        RegistrarMudancaPixel(i, j, replacementColor);
+                    }
+                }
+            }
+
+            FinalizarAcao();
+            pictureBoxCanvas.Invalidate();
+        }
         private void PictureBoxCanvas_Paint(object sender, PaintEventArgs e)
         {
             for (int i = 0; i < canvasBitmap.Width; i++)
