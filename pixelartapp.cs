@@ -427,60 +427,68 @@ namespace PixelArt
         }
 
         private void PictureBoxCanvas_MouseDown(object sender, MouseEventArgs e)
-        {
-            int x = e.X / pixelSize;
-            int y = e.Y / pixelSize;
+{
+    int x = e.X / pixelSize;
+    int y = e.Y / pixelSize;
 
-            if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
-                return;
+    if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
+        return;
 
-            mouseButtonInUse = e.Button; // guarda botão usado
+    mouseButtonInUse = e.Button;
+    isDrawing = true;
 
-            if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
-            {
-                startPoint = new Point(x, y);
-                currentPoint = startPoint.Value;
-                isDrawing = true;
-            }
-            else
-            {
-                isDrawing = true;
-                AplicarFerramenta(e.X, e.Y, e.Button);
-            }
-        }
+    IniciarAcao(); // Start a new undo action
 
-        private void PictureBoxCanvas_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (!isDrawing) return;
+    if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
+    {
+        startPoint = new Point(x, y);
+        currentPoint = startPoint.Value;
+    }
+    else
+    {
+        AplicarFerramenta(e.X, e.Y, e.Button);
+    }
+}
 
-            int x = e.X / pixelSize;
-            int y = e.Y / pixelSize;
-            if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
-                return;
+private void PictureBoxCanvas_MouseMove(object sender, MouseEventArgs e)
+{
+    int x = e.X / pixelSize;
+    int y = e.Y / pixelSize;
 
-            currentPoint = new Point(x, y);
-            if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
-                pictureBoxCanvas.Invalidate(); // Atualiza preview
-            else
-                AplicarFerramenta(e.X, e.Y, mouseButtonInUse); // usa o botão que iniciou o desenho
-        }
+    if (!isDrawing) return;
 
-        private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
-        {
-            if (!isDrawing) return;
+    if (x < 0 || y < 0 || x >= canvasBitmap.Width || y >= canvasBitmap.Height)
+        return;
 
-            int x = e.X / pixelSize;
-            int y = e.Y / pixelSize;
+    currentPoint = new Point(x, y);
 
-            if (startPoint != null && (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line"))
-            {
-                DesenharFormaFinal(startPoint.Value, new Point(x, y));
-                startPoint = null;
-            }
+    if (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line")
+    {
+        pictureBoxCanvas.Invalidate(); // Show preview
+    }
+    else
+    {
+        AplicarFerramenta(e.X, e.Y, mouseButtonInUse);
+    }
+}
 
-            isDrawing = false;
-            pictureBoxCanvas.Invalidate();
-        }
+private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
+{
+    if (!isDrawing) return;
+
+    int x = e.X / pixelSize;
+    int y = e.Y / pixelSize;
+
+    if (startPoint != null && (currentTool == "Rectangle" || currentTool == "Circle" || currentTool == "Line"))
+    {
+        DesenharFormaFinal(startPoint.Value, new Point(x, y));
+        startPoint = null;
+    }
+
+    isDrawing = false;
+    FinalizarAcao(); // End the undo action
+    pictureBoxCanvas.Invalidate();
+}
 
         private void AplicarFerramenta(int mouseX, int mouseY, MouseButtons botao)
         {
@@ -507,22 +515,21 @@ namespace PixelArt
 
             pictureBoxCanvas.Invalidate(new Rectangle(x * pixelSize, y * pixelSize, pixelSize, pixelSize));
 
-            void DesenharComEspelho(int x, int y, Color cor)
+            void DesenharComEspelho(int px, int py, Color cor)
             {
-                // Ponto original
-                canvasBitmap.SetPixel(x, y, cor);
+                // Use RegistrarMudancaPixel for all affected pixels
+                RegistrarMudancaPixel(px, py, cor);
 
                 int w = canvasBitmap.Width;
                 int h = canvasBitmap.Height;
 
                 if (mirrorMode == "H" || mirrorMode == "HV")
-                    canvasBitmap.SetPixel(w - 1 - x, y, cor);
+                    RegistrarMudancaPixel(w - 1 - px, py, cor);
                 if (mirrorMode == "V" || mirrorMode == "HV")
-                    canvasBitmap.SetPixel(x, h - 1 - y, cor);
+                    RegistrarMudancaPixel(px, h - 1 - py, cor);
                 if (mirrorMode == "HV")
-                    canvasBitmap.SetPixel(w - 1 - x, h - 1 - y, cor);
+                    RegistrarMudancaPixel(w - 1 - px, h - 1 - py, cor);
             }
-
         }
 
         private void PictureBoxCanvas_Paint(object sender, PaintEventArgs e)
@@ -550,8 +557,9 @@ namespace PixelArt
                         {
                             for (int j = 0; j < preview.Height; j++)
                             {
-                                using (Brush b = new SolidBrush(preview.GetPixel(i, j)))
-                                    e.Graphics.FillRectangle(b, i * pixelSize, j * pixelSize, pixelSize, pixelSize);
+                                Color pixel = preview.GetPixel(i, j);
+                                if (pixel.A == 0) continue;
+                                e.Graphics.FillRectangle(new SolidBrush(pixel), i * pixelSize, j * pixelSize, pixelSize, pixelSize);
                             }
                         }
                     }
@@ -668,7 +676,7 @@ namespace PixelArt
                     ExportarPNG();
 
                 else if (e.Control && e.KeyCode == Keys.Z)
-                    LimparCanvas();
+                    Undo();
             };
         }
 
@@ -679,7 +687,7 @@ namespace PixelArt
             int w = Math.Abs(p2.X - p1.X);
             int h = Math.Abs(p2.Y - p1.Y);
 
-            using (Graphics g = Graphics.FromImage(canvasBitmap))
+            using (Graphics g = Graphics.FromImage(canvasBitmap))   
             {
                 Pen pen = new Pen(currentColor, 1);
                 if (currentTool == "Rectangle")
@@ -696,58 +704,186 @@ namespace PixelArt
             pictureBoxCanvas.Invalidate();
         }
 
+        // Estrutura para armazenar cada alteração
+        public class PixelAction
+        {
+            public List<(int X, int Y, Color OldColor, Color NewColor)> Changes = new();
+        }
+
+        // Pilhas de desfazer/refazer
+        private Stack<PixelAction> undoStack = new();
+        private Stack<PixelAction> redoStack = new();
+
+        // Ao desenhar um pixel, registre as mudanças:
+        private PixelAction currentAction = null;
+
+        private void IniciarAcao()
+        {
+            currentAction = new PixelAction();
+            pixelsChangedThisAction.Clear();
+        }
+
+        private HashSet<(int, int)> pixelsChangedThisAction = new();
+
+        private void RegistrarMudancaPixel(int x, int y, Color newColor)
+        {
+            if (currentAction == null) return;
+            if (!pixelsChangedThisAction.Add((x, y))) return; // Only register the first change per pixel in this action
+
+            Color oldColor = canvasBitmap.GetPixel(x, y);
+            if (oldColor != newColor)
+            {
+                currentAction.Changes.Add((x, y, oldColor, newColor));
+                canvasBitmap.SetPixel(x, y, newColor);
+            }
+        }
+
+        private void FinalizarAcao()
+        {
+            if (currentAction != null && currentAction.Changes.Count > 0)
+            {
+                undoStack.Push(currentAction);
+                redoStack.Clear();
+            }
+            currentAction = null;
+            pixelsChangedThisAction.Clear();
+            pictureBoxCanvas.Invalidate();
+        }
+
+        private void Undo()
+        {
+            if (undoStack.Count == 0) return;
+
+            PixelAction lastAction = undoStack.Pop();
+            redoStack.Push(lastAction);
+
+            foreach (var (x, y, oldColor, _) in lastAction.Changes)
+                canvasBitmap.SetPixel(x, y, oldColor);
+
+            pictureBoxCanvas.Invalidate();
+        }
+
+        private void Redo()
+        {
+            if (redoStack.Count == 0) return;
+
+            PixelAction nextAction = redoStack.Pop();
+            undoStack.Push(nextAction);
+
+            foreach (var (x, y, _, newColor) in nextAction.Changes)
+                canvasBitmap.SetPixel(x, y, newColor);
+
+            pictureBoxCanvas.Invalidate();
+        }
+
+
+        private List<Point> ObterPixelsForma(Point p1, Point p2, string ferramenta)
+        {
+            List<Point> pixels = new List<Point>();
+            int w = canvasBitmap.Width;
+            int h = canvasBitmap.Height;
+
+            switch (ferramenta)
+            {
+                case "Rectangle":
+                    {
+                        int x = Math.Min(p1.X, p2.X);
+                        int y = Math.Min(p1.Y, p2.Y);
+                        int width = Math.Abs(p2.X - p1.X);
+                        int height = Math.Abs(p2.Y - p1.Y);
+
+                        for (int i = x; i <= x + width; i++)
+                        {
+                            pixels.Add(new Point(i, y));
+                            pixels.Add(new Point(i, y + height));
+                        }
+                        for (int j = y + 1; j < y + height; j++)
+                        {
+                            pixels.Add(new Point(x, j));
+                            pixels.Add(new Point(x + width, j));
+                        }
+                    }
+                    break;
+
+                case "Circle":
+                    {
+                        int x = Math.Min(p1.X, p2.X);
+                        int y = Math.Min(p1.Y, p2.Y);
+                        int width = Math.Abs(p2.X - p1.X);
+                        int height = Math.Abs(p2.Y - p1.Y);
+
+                        double rx = width / 2.0;
+                        double ry = height / 2.0;
+                        double cx = x + rx;
+                        double cy = y + ry;
+
+                        for (int i = x; i <= x + width; i++)
+                        {
+                            for (int j = y; j <= y + height; j++)
+                            {
+                                double dx = i - cx;
+                                double dy = j - cy;
+                                double dist = Math.Pow(dx / rx, 2) + Math.Pow(dy / ry, 2);
+                                if (dist >= 0.85 && dist <= 1.15) // contorno mais preciso
+                                    pixels.Add(new Point(i, j));
+                            }
+                        }
+                    }
+                    break;
+
+                case "Line":
+                    pixels = ObterPixelsLinhaBresenham(p1.X, p1.Y, p2.X, p2.Y);
+                    break;
+            }
+
+            // Aplica espelho nos pixels
+            List<Point> todosPixels = new List<Point>(pixels);
+            foreach (var p in pixels)
+            {
+                if (mirrorMode == "H" || mirrorMode == "HV")
+                    todosPixels.Add(new Point(w - 1 - p.X, p.Y));
+                if (mirrorMode == "V" || mirrorMode == "HV")
+                    todosPixels.Add(new Point(p.X, h - 1 - p.Y));
+                if (mirrorMode == "HV")
+                    todosPixels.Add(new Point(w - 1 - p.X, h - 1 - p.Y));
+            }
+
+            // Remove duplicados fora do canvas
+            List<Point> finalPixels = new List<Point>();
+            foreach (var p in todosPixels)
+            {
+                if (p.X >= 0 && p.Y >= 0 && p.X < w && p.Y < h && !finalPixels.Contains(p))
+                    finalPixels.Add(p);
+            }
+
+            return finalPixels;
+        }
+
+        private void DesenharFormaFinal(Point p1, Point p2)
+        {
+            Color corUsar = mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor;
+            List<Point> pixels = ObterPixelsForma(p1, p2, currentTool);
+
+            foreach (var p in pixels)
+                RegistrarMudancaPixel(p.X, p.Y, corUsar); // Register each pixel change
+
+            pictureBoxCanvas.Invalidate();
+        }
+
         private Bitmap GerarPreviewForma()
         {
             if (startPoint == null) return null;
 
             Bitmap preview = (Bitmap)canvasBitmap.Clone();
             Color corUsar = mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor;
+            Color corPreview = Color.FromArgb(120, corUsar.R, corUsar.G, corUsar.B); // semi-transparente
 
-            int x = Math.Min(startPoint.Value.X, currentPoint.X);
-            int y = Math.Min(startPoint.Value.Y, currentPoint.Y);
-            int w = Math.Abs(currentPoint.X - startPoint.Value.X);
-            int h = Math.Abs(currentPoint.Y - startPoint.Value.Y);
+            List<Point> pixels = ObterPixelsForma(startPoint.Value, currentPoint, currentTool);
 
-            using (Graphics g = Graphics.FromImage(preview))
-            {
-                // Cria uma caneta semi-transparente para o preview
-                Color corPreview = Color.FromArgb(120, corUsar.R, corUsar.G, corUsar.B); // 120 = semi-transparente
-                using (Pen pen = new Pen(corPreview))
-                {
-                    if (currentTool == "Rectangle")
-                        g.DrawRectangle(pen, x, y, w, h);
-                    else if (currentTool == "Circle")
-                        g.DrawEllipse(pen, x, y, w, h);
-                }
-            }
+            foreach (var p in pixels)
+                preview.SetPixel(p.X, p.Y, corPreview);
 
             return preview;
-        }
-        private void DesenharFormaFinal(Point p1, Point p2)
-        {
-            Color corUsar = mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor;
-
-            using (Graphics g = Graphics.FromImage(canvasBitmap))
-            {
-                Pen pen = new Pen(corUsar);
-                int x = Math.Min(p1.X, p2.X);
-                int y = Math.Min(p1.Y, p2.Y);
-                int w = Math.Abs(p2.X - p1.X);
-                int h = Math.Abs(p2.Y - p1.Y);
-
-                switch (currentTool)
-                {
-                    case "Rectangle":
-                        g.DrawRectangle(pen, x, y, w, h);
-                        break;
-                    case "Circle":
-                        g.DrawEllipse(pen, x, y, w, h);
-                        break;
-                    case "Line":
-                        DesenharLinhaBresenham(p1.X, p1.Y, p2.X, p2.Y, corUsar);
-                        break;
-                }
-            }
         }
 
         private void DesenharLinhaBresenham(int x0, int y0, int x1, int y1, Color color)
