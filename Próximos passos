@@ -1,12 +1,7 @@
 Próximos passos:
-
-Undo/Redo real (pilha de estados).
-
 Atalhos rápidos para ferramentas (ex: P = lápis, B = borracha, F = balde).
 
-Preview de espelho enquanto desenha.
-
-Fill preview para balde de tinta (opcional).
+Preview de espelho enquanto desenha (falta linha(não espelhado o preview), lápis e borracha (tem que desenhar junto no espelho)).
 
 Zoom mais suave com Ctrl + Mouse Wheel.
 
