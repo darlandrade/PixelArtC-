@@ -288,14 +288,15 @@ namespace PixelArt
                 Height = 30,
                 Left = btnAddColor.Right + 80,
                 Top = btnAddColor.Top,
-                Image = PixelArt.Properties.Resources.Trash // Add a trash icon to your resources
+                Image = PixelArt.Properties.Resources.Trashbtn // Add a trash icon to your resources
             };
             btnRemoveColor.ImageAlign = ContentAlignment.MiddleCenter;
             btnRemoveColor.TextImageRelation = TextImageRelation.Overlay;
+            btnRemoveColor.Text = "";
             btnRemoveColor.Click += (s, e) =>
             {
                 removeColorMode = !removeColorMode;
-                btnRemoveColor.BackColor = removeColorMode ? Color.LightCoral : SystemColors.Control;
+                btnRemoveColor.BackColor = removeColorMode ? Color.DarkRed : SystemColors.Control;
                 AtualizarPaleta();
             };
             panelFuncoes.Controls.Add(btnRemoveColor);
@@ -400,8 +401,8 @@ namespace PixelArt
                     if (removeColorMode && colorBtn.Enabled)
                     {
                         var g = e.Graphics;
-                        g.DrawLine(Pens.Red, 5, 5, btnSize - 5, btnSize - 5);
-                        g.DrawLine(Pens.Red, btnSize - 5, 5, 5, btnSize - 5);
+                        g.DrawLine(Pens.Black, 5, 5, btnSize - 5, btnSize - 5); // \
+                        g.DrawLine(Pens.Black, btnSize - 5, 5, 5, btnSize - 5); // X
                     }
                 };
 
@@ -802,7 +803,7 @@ namespace PixelArt
         private Stack<PixelAction> undoStack = new();
         private Stack<PixelAction> redoStack = new();
 
-        // Ao desenhar um pixel, registre as mudanças:
+        // Ao desenhar um pixel,registre as mudanças:
         private PixelAction currentAction = null;
 
         private void IniciarAcao()
