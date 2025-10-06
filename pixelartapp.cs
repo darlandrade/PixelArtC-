@@ -229,6 +229,12 @@ namespace PixelArt
         private Panel panelLeftColor;
         private Panel panelRightColor;
 
+        // --- Palette Area Refactored ---
+        // Place this inside your Form1 class, replacing your current CriarFuncoes and AtualizarPaleta methods.
+        // This version ensures proper toggling of remove mode, visual feedback, and correct button recreation.
+
+        private Button btnRemoveColor; // Make this a field so you can update its state
+
         private void CriarFuncoes()
         {
             Label lblPaleta = new Label
@@ -245,29 +251,8 @@ namespace PixelArt
             int margem = 5;
             int inicioY = lblPaleta.Bottom + 15;
 
-            for (int i = 0; i < 15; i++)
-            {
-                Button colorBtn = new Button
-                {
-                    Width = btnSize,
-                    Height = btnSize,
-                    Left = 10 + (i % 5) * (btnSize + margem),
-                    Top = inicioY + (i / 5) * (btnSize + margem),
-                    BackColor = i < paletteColors.Count ? paletteColors[i] : Color.Transparent,
-                    Enabled = i < paletteColors.Count,
-                    FlatStyle = FlatStyle.Flat
-                };
-
-                colorBtn.MouseDown += (s, e) =>
-                {
-                    if (!colorBtn.Enabled) return;
-                    if (e.Button == MouseButtons.Left) currentColor = colorBtn.BackColor;
-                    else if (e.Button == MouseButtons.Right) secondaryColor = colorBtn.BackColor;
-                    AtualizarIndicadoresDeCor();
-                };
-
-                panelFuncoes.Controls.Add(colorBtn);
-            }
+            // Create color buttons (will be recreated in AtualizarPaleta)
+            AtualizarPaleta();
 
             // Botão "+"
             Button btnAddColor = new Button
@@ -295,6 +280,25 @@ namespace PixelArt
                     MessageBox.Show("A paleta está cheia (máx. 15 cores).", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
             panelFuncoes.Controls.Add(btnAddColor);
+
+            // Botão de remover cor (trash)
+            btnRemoveColor = new Button
+            {
+                Width = 30,
+                Height = 30,
+                Left = btnAddColor.Right + 80,
+                Top = btnAddColor.Top,
+                Image = PixelArt.Properties.Resources.Trash // Add a trash icon to your resources
+            };
+            btnRemoveColor.ImageAlign = ContentAlignment.MiddleCenter;
+            btnRemoveColor.TextImageRelation = TextImageRelation.Overlay;
+            btnRemoveColor.Click += (s, e) =>
+            {
+                removeColorMode = !removeColorMode;
+                btnRemoveColor.BackColor = removeColorMode ? Color.LightCoral : SystemColors.Control;
+                AtualizarPaleta();
+            };
+            panelFuncoes.Controls.Add(btnRemoveColor);
 
             // Painel indicador da cor do botão esquerdo
             panelLeftColor = new Panel
@@ -357,49 +361,79 @@ namespace PixelArt
             };
             btnMirrorHV.Click += (s, e) => AtivarEspelho("HV");
             panelFuncoes.Controls.Add(btnMirrorHV);
-
-        }
-
-        // Atualiza os painéis de cor
-        private void AtualizarIndicadoresDeCor()
-        {
-            if (panelLeftColor != null) panelLeftColor.BackColor = currentColor;
-            if (panelRightColor != null) panelRightColor.BackColor = secondaryColor;
         }
 
         private void AtualizarPaleta()
         {
-            int i = 0;
-            foreach (Control c in panelFuncoes.Controls)
+            // Remove only color buttons (not "+", trash, indicators, or mirror buttons)
+            for (int i = panelFuncoes.Controls.Count - 1; i >= 0; i--)
             {
-                if (c is Button btn && btn.Text == "")
+                var c = panelFuncoes.Controls[i];
+                if (c is Button btn && btn.Tag is string tag && tag == "palette")
+                    panelFuncoes.Controls.RemoveAt(i);
+            }
+
+            int btnSize = 30;
+            int margem = 5;
+            int inicioY = 55; // adjust as needed
+
+            for (int i = 0; i < 15; i++)
+            {
+                Button colorBtn = new Button
                 {
-                    if (i < paletteColors.Count)
+                    Width = btnSize,
+                    Height = btnSize,
+                    Left = 10 + (i % 5) * (btnSize + margem),
+                    Top = inicioY + (i / 5) * (btnSize + margem),
+                    BackColor = i < paletteColors.Count ? paletteColors[i] : Color.Transparent,
+                    Enabled = i < paletteColors.Count,
+                    FlatStyle = FlatStyle.Flat,
+                    Text = "",
+                    Tag = "palette" // Mark for easy removal
+                };
+
+                colorBtn.Tag = "palette";
+                colorBtn.AccessibleDescription = i.ToString(); // Store index for removal
+
+                colorBtn.Paint += (s, e) =>
+                {
+                    if (removeColorMode && colorBtn.Enabled)
                     {
-                        btn.BackColor = paletteColors[i];
-                        btn.Enabled = true;
+                        var g = e.Graphics;
+                        g.DrawLine(Pens.Red, 5, 5, btnSize - 5, btnSize - 5);
+                        g.DrawLine(Pens.Red, btnSize - 5, 5, 5, btnSize - 5);
+                    }
+                };
+
+                colorBtn.MouseDown += (s, e) =>
+                {
+                    if (!colorBtn.Enabled) return;
+                    int idx = int.Parse(colorBtn.AccessibleDescription);
+                    if (removeColorMode)
+                    {
+                        if (idx < paletteColors.Count)
+                        {
+                            paletteColors.RemoveAt(idx);
+                            AtualizarPaleta();
+                        }
                     }
                     else
                     {
-                        btn.BackColor = Color.LightGray; // indica que não há cor
-                        btn.Enabled = false;
+                        if (e.Button == MouseButtons.Left)
+                        {
+                            currentColor = colorBtn.BackColor;
+                            AtualizarIndicadoresDeCor();
+                        }
+                        else if (e.Button == MouseButtons.Right)
+                        {
+                            secondaryColor = colorBtn.BackColor;
+                            AtualizarIndicadoresDeCor();
+                        }
                     }
-                    i++;
-                }
+                };
+
+                panelFuncoes.Controls.Add(colorBtn);
             }
-        }
-
-        private void AtivarEspelho(string mode)
-        {
-            mirrorMode = mirrorMode == mode ? "None" : mode; // alterna ao clicar novamente
-            AtualizarBotoesEspelho();
-        }
-
-        private void AtualizarBotoesEspelho()
-        {
-            btnMirrorH.BackColor = mirrorMode == "H" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
-            btnMirrorV.BackColor = mirrorMode == "V" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
-            btnMirrorHV.BackColor = mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
         }
 
         private void CriarRodape()
@@ -451,7 +485,7 @@ namespace PixelArt
                 AplicarFerramenta(e.X, e.Y, e.Button);
                 pictureBoxCanvas.Invalidate(); // Ensure immediate redraw
             }
-}
+        }
 
         private void PictureBoxCanvas_MouseMove(object sender, MouseEventArgs e)
         {
@@ -585,20 +619,20 @@ namespace PixelArt
             }
             // Pencil/Eraser preview
             else if (isDrawing && (currentTool == "Pencil" || currentTool == "Eraser") && lastPreviewPoint != null)
-{
-    Color corPreview = currentTool == "Eraser" ? Color.Transparent : (mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor);
-    var previewPixels = ObterPixelsLinhaBresenham(lastPreviewPoint.Value.X, lastPreviewPoint.Value.Y, currentPoint.X, currentPoint.Y);
+            {
+                Color corPreview = currentTool == "Eraser" ? Color.Transparent : (mouseButtonInUse == MouseButtons.Left ? currentColor : secondaryColor);
+                var previewPixels = ObterPixelsLinhaBresenham(lastPreviewPoint.Value.X, lastPreviewPoint.Value.Y, currentPoint.X, currentPoint.Y);
 
-    foreach (var p in GetMirroredPoints(previewPixels, canvasBitmap.Width, canvasBitmap.Height, mirrorMode))
-    {
-        Color drawColor = corPreview == Color.Transparent
-            ? Color.FromArgb(80, 200, 200, 200)
-            : Color.FromArgb(120, corPreview.R, corPreview.G, corPreview.B);
+                foreach (var p in GetMirroredPoints(previewPixels, canvasBitmap.Width, canvasBitmap.Height, mirrorMode))
+                {
+                    Color drawColor = corPreview == Color.Transparent
+                        ? Color.FromArgb(80, 200, 200, 200)
+                        : Color.FromArgb(120, corPreview.R, corPreview.G, corPreview.B);
 
-        using (Brush b = new SolidBrush(drawColor))
-            e.Graphics.FillRectangle(b, p.X * pixelSize, p.Y * pixelSize, pixelSize, pixelSize);
-    }
-}
+                    using (Brush b = new SolidBrush(drawColor))
+                        e.Graphics.FillRectangle(b, p.X * pixelSize, p.Y * pixelSize, pixelSize, pixelSize);
+                }
+            }
 
             // --- Grid ---
             Pen gridPen = new Pen(Color.FromArgb(40, 0, 0, 0)); // Grid semi-transparente
@@ -741,7 +775,7 @@ namespace PixelArt
             int w = Math.Abs(p2.X - p1.X);
             int h = Math.Abs(p2.Y - p1.Y);
 
-            using (Graphics g = Graphics.FromImage(canvasBitmap))   
+            using (Graphics g = Graphics.FromImage(canvasBitmap))
             {
                 Pen pen = new Pen(currentColor, 1);
                 if (currentTool == "Rectangle")
@@ -988,6 +1022,27 @@ namespace PixelArt
         }
 
         private Point? lastPreviewPoint = null;
+        private bool removeColorMode = false;
+
+        private void AtivarEspelho(string mode)
+        {
+            // Toggle mirror mode between None and the selected mode
+            mirrorMode = mirrorMode == mode ? "None" : mode;
+            AtualizarBotoesEspelho();
+        }
+
+        private void AtualizarBotoesEspelho()
+        {
+            btnMirrorH.BackColor = mirrorMode == "H" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
+            btnMirrorV.BackColor = mirrorMode == "V" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
+            btnMirrorHV.BackColor = mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
+        }
+
+        private void AtualizarIndicadoresDeCor()
+        {
+            if (panelLeftColor != null) panelLeftColor.BackColor = currentColor;
+            if (panelRightColor != null) panelRightColor.BackColor = secondaryColor;
+        }
     }
 
 }
