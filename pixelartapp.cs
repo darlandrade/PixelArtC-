@@ -807,26 +807,50 @@ private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
 
                 case "Circle":
                     {
-                        int x = Math.Min(p1.X, p2.X);
-                        int y = Math.Min(p1.Y, p2.Y);
-                        int width = Math.Abs(p2.X - p1.X);
-                        int height = Math.Abs(p2.Y - p1.Y);
+                        int x0 = Math.Min(p1.X, p2.X);
+                        int y0 = Math.Min(p1.Y, p2.Y);
+                        int x1 = Math.Max(p1.X, p2.X);
+                        int y1 = Math.Max(p1.Y, p2.Y);
 
-                        double rx = width / 2.0;
-                        double ry = height / 2.0;
-                        double cx = x + rx;
-                        double cy = y + ry;
+                        int a = (x1 - x0) / 2;
+                        int b = (y1 - y0) / 2;
+                        int xc = x0 + a;
+                        int yc = y0 + b;
 
-                        for (int i = x; i <= x + width; i++)
+                        if (a == 0 || b == 0)
+                            break;
+
+                        int a2 = a * a, b2 = b * b;
+                        int fa2 = 4 * a2, fb2 = 4 * b2;
+                        int x, y, sigma;
+
+                        // First half
+                        for (x = 0, y = b, sigma = 2 * b2 + a2 * (1 - 2 * b); b2 * x <= a2 * y; x++)
                         {
-                            for (int j = y; j <= y + height; j++)
+                            pixels.Add(new Point(xc + x, yc + y));
+                            pixels.Add(new Point(xc - x, yc + y));
+                            pixels.Add(new Point(xc + x, yc - y));
+                            pixels.Add(new Point(xc - x, yc - y));
+                            if (sigma >= 0)
                             {
-                                double dx = i - cx;
-                                double dy = j - cy;
-                                double dist = Math.Pow(dx / rx, 2) + Math.Pow(dy / ry, 2);
-                                if (dist >= 0.85 && dist <= 1.15) // contorno mais preciso
-                                    pixels.Add(new Point(i, j));
+                                sigma += fa2 * (1 - y);
+                                y--;
                             }
+                            sigma += b2 * ((4 * x) + 6);
+                        }
+                        // Second half
+                        for (x = a, y = 0, sigma = 2 * a2 + b2 * (1 - 2 * a); a2 * y <= b2 * x; y++)
+                        {
+                            pixels.Add(new Point(xc + x, yc + y));
+                            pixels.Add(new Point(xc - x, yc + y));
+                            pixels.Add(new Point(xc + x, yc - y));
+                            pixels.Add(new Point(xc - x, yc - y));
+                            if (sigma >= 0)
+                            {
+                                sigma += fb2 * (1 - x);
+                                x--;
+                            }
+                            sigma += a2 * ((4 * y) + 6);
                         }
                     }
                     break;
@@ -837,26 +861,19 @@ private void PictureBoxCanvas_MouseUp(object sender, MouseEventArgs e)
             }
 
             // Aplica espelho nos pixels
-            List<Point> todosPixels = new List<Point>(pixels);
+            HashSet<Point> finalPixels = new HashSet<Point>(pixels);
             foreach (var p in pixels)
             {
                 if (mirrorMode == "H" || mirrorMode == "HV")
-                    todosPixels.Add(new Point(w - 1 - p.X, p.Y));
+                    finalPixels.Add(new Point(w - 1 - p.X, p.Y));
                 if (mirrorMode == "V" || mirrorMode == "HV")
-                    todosPixels.Add(new Point(p.X, h - 1 - p.Y));
+                    finalPixels.Add(new Point(p.X, h - 1 - p.Y));
                 if (mirrorMode == "HV")
-                    todosPixels.Add(new Point(w - 1 - p.X, h - 1 - p.Y));
+                    finalPixels.Add(new Point(w - 1 - p.X, h - 1 - p.Y));
             }
 
-            // Remove duplicados fora do canvas
-            List<Point> finalPixels = new List<Point>();
-            foreach (var p in todosPixels)
-            {
-                if (p.X >= 0 && p.Y >= 0 && p.X < w && p.Y < h && !finalPixels.Contains(p))
-                    finalPixels.Add(p);
-            }
-
-            return finalPixels;
+            // Remove pixels out of bounds
+            return finalPixels.Where(p => p.X >= 0 && p.Y >= 0 && p.X < w && p.Y < h).ToList();
         }
 
         private void DesenharFormaFinal(Point p1, Point p2)
