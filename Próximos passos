@@ -6,3 +6,6 @@ Zoom mais suave com Ctrl + Mouse Wheel.
 Indicador de tamanho do pixel e coordenadas do mouse no rodapé.
 
 Melhor performance para canvas grande usando LockBits para desenho contínuo.
+
+--Melhorar os frames
+-Adicionar camadas
