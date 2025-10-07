@@ -48,9 +48,12 @@ namespace PixelArt
             CriarRodape();
             ConfigurarAtalhos();
 
+            frames.Add(canvasBitmap);
+
             // Define que a janela será manualmente posicionada
             this.StartPosition = FormStartPosition.Manual;
 
+            
             // Ajusta o tamanho inicial para 90% da tela e centraliza
             this.Load += (s, e) =>
             {
@@ -456,8 +459,54 @@ namespace PixelArt
             };
             btnExportar.Click += (s, e) => ExportarPNG();
             panelRodape.Controls.Add(btnExportar);
+
+            Button btnPrevFrame = new Button { Text = "<", Width = 40, Height = 30, Left = 140, Top = 10 };
+            btnPrevFrame.Click += (s, e) => TrocarFrame(currentFrameIndex - 1);
+            panelRodape.Controls.Add(btnPrevFrame);
+
+            Button btnNextFrame = new Button { Text = ">", Width = 40, Height = 30, Left = 190, Top = 10 };
+            btnNextFrame.Click += (s, e) => TrocarFrame(currentFrameIndex + 1);
+            panelRodape.Controls.Add(btnNextFrame);
+
+            Button btnAddFrame = new Button { Text = "+ Frame", Width = 80, Height = 30, Left = 240, Top = 10 };
+            btnAddFrame.Click += (s, e) => AdicionarFrame();
+            panelRodape.Controls.Add(btnAddFrame);
+
+            Button btnDeleteFrame = new Button { Text = "- Frame", Width = 80, Height = 30, Left = 330, Top = 10 };
+            btnDeleteFrame.Click += (s, e) => RemoverFrame();
+            panelRodape.Controls.Add(btnDeleteFrame);
         }
 
+        private void TrocarFrame(int newIndex)
+        {
+            if (newIndex < 0 || newIndex >= frames.Count) return;
+            currentFrameIndex = newIndex;
+            canvasBitmap = frames[currentFrameIndex];
+            pictureBoxCanvas.Image = canvasBitmap;
+            pictureBoxCanvas.Width = canvasBitmap.Width * pixelSize;
+            pictureBoxCanvas.Height = canvasBitmap.Height * pixelSize;
+            pictureBoxCanvas.Invalidate();
+        }
+
+        private void AdicionarFrame()
+        {
+            Bitmap newFrame = new Bitmap(canvasBitmap.Width, canvasBitmap.Height);
+            using (Graphics g = Graphics.FromImage(newFrame))
+                g.Clear(Color.Transparent);
+            frames.Insert(currentFrameIndex + 1, newFrame);
+            TrocarFrame(currentFrameIndex + 1);
+        }
+
+        private void RemoverFrame()
+        {
+            if (frames.Count <= 1) return;
+            frames.RemoveAt(currentFrameIndex);
+            if (currentFrameIndex >= frames.Count)
+                currentFrameIndex = frames.Count - 1;
+            canvasBitmap = frames[currentFrameIndex];
+            pictureBoxCanvas.Image = canvasBitmap;
+            pictureBoxCanvas.Invalidate();
+        }
         private void ExportarPNG()
         {
             using (SaveFileDialog sfd = new SaveFileDialog())
@@ -1086,6 +1135,9 @@ namespace PixelArt
             if (panelLeftColor != null) panelLeftColor.BackColor = currentColor;
             if (panelRightColor != null) panelRightColor.BackColor = secondaryColor;
         }
+
+        private List<Bitmap> frames = new(); // Lista de frames para animação
+        private int currentFrameIndex = 0; // Índice do frame atual
     }
 
 }
