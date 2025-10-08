@@ -33,6 +33,18 @@ namespace PixelArt
         private Button btnMirrorV;
         private Button btnMirrorHV;
 
+        // Atalhos
+        private Button btnPencil;
+        private Button btnEraser;
+        private Button btnBucket;
+        private Button btnRectangle;
+        private Button btnCircle;
+        private Button btnLine;
+        private Button btnReplaceColor;
+        private Button btnColorPicker;
+
+
+
         private List<Color> paletteColors = new List<Color>
         {
             Color.Black, Color.Red, Color.Green, Color.Blue, Color.Yellow
@@ -49,11 +61,11 @@ namespace PixelArt
             ConfigurarAtalhos();
 
             frames.Add(canvasBitmap);
-
+            this.Icon = new Icon("pixelarticon.ico"); // Define o ícone do formulário)
             // Define que a janela será manualmente posicionada
             this.StartPosition = FormStartPosition.Manual;
 
-            
+
             // Ajusta o tamanho inicial para 90% da tela e centraliza
             this.Load += (s, e) =>
             {
@@ -203,38 +215,56 @@ namespace PixelArt
         {
             int top = 20;
 
-            Button btnPencil = new Button { Text = "Lápis", Left = 10, Top = top, Width = 100 };
-            btnPencil.Click += (s, e) => currentTool = "Pencil";
+            // Create buttons
+            btnPencil = new Button { Text = "Lápis", Left = 10, Top = top, Width = 100 };
+            btnPencil.Click += (s, e) => { currentTool = "Pencil"; SetActiveButton(btnPencil); };
             panelFerramentas.Controls.Add(btnPencil);
 
-            Button btnEraser = new Button { Text = "Borracha", Left = 10, Top = top + 40, Width = 100 };
-            btnEraser.Click += (s, e) => currentTool = "Eraser";
+            btnEraser = new Button { Text = "Borracha", Left = 10, Top = top + 40, Width = 100 };
+            btnEraser.Click += (s, e) => { currentTool = "Eraser"; SetActiveButton(btnEraser); };
             panelFerramentas.Controls.Add(btnEraser);
 
-            Button btnBucket = new Button { Text = "Balde", Left = 10, Top = top + 80, Width = 100 };
-            btnBucket.Click += (s, e) => currentTool = "Bucket";
+            btnBucket = new Button { Text = "Balde", Left = 10, Top = top + 80, Width = 100 };
+            btnBucket.Click += (s, e) => { currentTool = "Bucket"; SetActiveButton(btnBucket); };
             panelFerramentas.Controls.Add(btnBucket);
 
-            Button btnRectangle = new Button { Text = "Retângulo", Left = 10, Top = top + 120, Width = 100 };
-            btnRectangle.Click += (s, e) => currentTool = "Rectangle";
+            btnRectangle = new Button { Text = "Retângulo", Left = 10, Top = top + 120, Width = 100 };
+            btnRectangle.Click += (s, e) => { currentTool = "Rectangle"; SetActiveButton(btnRectangle); };
             panelFerramentas.Controls.Add(btnRectangle);
 
-            Button btnCircle = new Button { Text = "Círculo", Left = 10, Top = top + 160, Width = 100 };
-            btnCircle.Click += (s, e) => currentTool = "Circle";
+            btnCircle = new Button { Text = "Círculo", Left = 10, Top = top + 160, Width = 100 };
+            btnCircle.Click += (s, e) => { currentTool = "Circle"; SetActiveButton(btnCircle); };
             panelFerramentas.Controls.Add(btnCircle);
 
-            Button btnLine = new Button { Text = "Linha", Left = 10, Top = top + 200, Width = 100 };
-            btnLine.Click += (s, e) => currentTool = "Line";
+            btnLine = new Button { Text = "Linha", Left = 10, Top = top + 200, Width = 100 };
+            btnLine.Click += (s, e) => { currentTool = "Line"; SetActiveButton(btnLine); };
             panelFerramentas.Controls.Add(btnLine);
 
-            Button btnReplaceColor = new Button { Text = "Trocar Cor", Left = 10, Top = top + 240, Width = 100 };
-            btnReplaceColor.Click += (s, e) => currentTool = "ReplaceColor";
+            btnReplaceColor = new Button { Text = "Trocar Cor", Left = 10, Top = top + 240, Width = 100 };
+            btnReplaceColor.Click += (s, e) => { currentTool = "ReplaceColor"; SetActiveButton(btnReplaceColor); };
             panelFerramentas.Controls.Add(btnReplaceColor);
 
-            Button btnColorPicker = new Button { Text = "Conta-gotas", Left = 10, Top = top + 280, Width = 100 };
-            btnColorPicker.Click += (s, e) => currentTool = "ColorPicker";
+            btnColorPicker = new Button { Text = "Conta-gotas", Left = 10, Top = top + 280, Width = 100 };
+            btnColorPicker.Click += (s, e) => { currentTool = "ColorPicker"; SetActiveButton(btnColorPicker); };
             panelFerramentas.Controls.Add(btnColorPicker);
+
+            // Function to handle active button highlighting
+            void SetActiveButton(Button activeBtn)
+            {
+                foreach (var ctrl in panelFerramentas.Controls)
+                {
+                    if (ctrl is Button btn)
+                        btn.BackColor = SystemColors.Control; // reset all
+                }
+                activeBtn.BackColor = Color.LightBlue; // highlight current
+            }
+
+            // Set default active button
+            SetActiveButton(btnPencil);
+            currentTool = "Pencil";
+
         }
+
 
         private Panel panelLeftColor;
         private Panel panelRightColor;
@@ -847,16 +877,46 @@ namespace PixelArt
             pictureBoxCanvas.Invalidate();
         }
 
-        private void ConfigurarAtalhos()
+        private void ConfigurarAtalhos() // Configura os atalhos de teclado
         {
             KeyPreview = true;
             KeyDown += (s, e) =>
             {
-                if (e.Control && e.KeyCode == Keys.S)
+                if (e.Control && e.KeyCode == Keys.S) // Ctrl+S for Save
                     ExportarPNG();
 
-                else if (e.Control && e.KeyCode == Keys.Z)
+                else if (e.Control && e.KeyCode == Keys.Z) // Ctrl+Z for Undo
                     Undo();
+
+                else if (e.Control && e.KeyCode == Keys.B) // Ctrl+B for replace color
+                    btnReplaceColor.PerformClick();
+
+                else if (e.Shift && e.KeyCode == Keys.H) // Shift+H for Mirror Horizontal
+                    btnMirrorH.PerformClick();
+
+                else if (e.Shift && e.KeyCode == Keys.V) // Shift+H for Mirror Vertical
+                    btnMirrorV.PerformClick();
+
+                else if (e.KeyCode == Keys.P) // P for Pencil
+                    btnPencil.PerformClick();
+
+                else if (e.KeyCode == Keys.E) // E for Eraser
+                    btnEraser.PerformClick();
+
+                else if (e.KeyCode == Keys.B) // B for Bucket
+                    btnBucket.PerformClick();
+
+                else if (e.KeyCode == Keys.C) // C for Circle
+                    btnCircle.PerformClick();
+
+                else if (e.KeyCode == Keys.R) // R for Rectangle
+                    btnRectangle.PerformClick();
+
+                else if (e.KeyCode == Keys.L) // L for Line
+                    btnLine.PerformClick();
+
+                else if (e.KeyCode == Keys.Q) // Q for Color Picker 
+                    btnColorPicker.PerformClick();
             };
         }
 
@@ -1125,7 +1185,7 @@ namespace PixelArt
 
         private void AtualizarBotoesEspelho()
         {
-            btnMirrorH.BackColor = mirrorMode == "H" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
+            btnMirrorH.BackColor = mirrorMode == "H" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray; // Highlight if active
             btnMirrorV.BackColor = mirrorMode == "V" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
             btnMirrorHV.BackColor = mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
         }
