@@ -1,14 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
+
+
 namespace PixelArt
-{
+{    
     public partial class Form1 : Form
     {
+
+        readonly Color FUNDOJANELA = Color.FromArgb(60,60,60);
+        readonly Color FUNDOBTN = Color.FromArgb(30,30,30);
+        readonly Color BTNBORDER = Color.FromArgb(10,10,10);
+        readonly Color MOUSEHOVERBTN = Color.FromArgb(22, 118, 120);
+
         private Panel panelFerramentas;
         private Panel panelCanvas;
         private Panel panelFuncoes;
@@ -16,7 +25,6 @@ namespace PixelArt
         private PictureBox pictureBoxCanvas;
 
         private Bitmap canvasBitmap;
-        private Color currentColor = Color.Black;
         private int pixelSize = 20;
         private bool isDrawing = false;
         private string currentTool = "Pencil"; // Lápis, Borracha, Balde
@@ -25,7 +33,8 @@ namespace PixelArt
         private Point currentPoint;         // posição atual do mouse
 
         private MouseButtons mouseButtonInUse; // Botão que iniciou o desenho
-        private Color secondaryColor = Color.Chartreuse; // Cor do botão direito
+        private Color currentColor = Color.Black;
+        private Color secondaryColor = Color.Transparent; // Cor do botão direito
 
         // Espelho
         private string mirrorMode = "None"; // "None", "H", "V", "HV"
@@ -43,6 +52,8 @@ namespace PixelArt
         private Button btnReplaceColor;
         private Button btnColorPicker;
 
+        // At the class level (top of your Form)
+        private Dictionary<string, Button> toolButtons = new(); // Map tool names to buttons
 
 
         private List<Color> paletteColors = new List<Color>
@@ -59,6 +70,8 @@ namespace PixelArt
             CriarFuncoes();
             CriarRodape();
             ConfigurarAtalhos();
+
+            this.Text = "Pixel Art Editor"; //  Título do formulário
 
             frames.Add(canvasBitmap);
             this.Icon = new Icon("pixelarticon.ico"); // Define o ícone do formulário)
@@ -129,7 +142,7 @@ namespace PixelArt
             {
                 Dock = DockStyle.Left,
                 Width = 120,
-                BackColor = Color.LightGray
+                BackColor = FUNDOJANELA
             };
             Controls.Add(panelFerramentas);
 
@@ -138,9 +151,9 @@ namespace PixelArt
             {
                 Dock = DockStyle.Right,
                 Width = 200,
-                BackColor = Color.LightGray,
+                BackColor = FUNDOJANELA,
                 Padding = new Padding(10),
-                AutoScroll = true
+                AutoScroll = true,
             };
             Controls.Add(panelFuncoes);
 
@@ -149,7 +162,7 @@ namespace PixelArt
             {
                 Dock = DockStyle.Bottom,
                 Height = 50,
-                BackColor = Color.LightGray,
+                BackColor = FUNDOJANELA,
                 Padding = new Padding(10)
             };
             Controls.Add(panelRodape);
@@ -158,7 +171,7 @@ namespace PixelArt
             panelCanvas = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.Gray, // dá contraste para ver o canvas
+                BackColor = Color.DarkGray, // dá contraste para ver o canvas
                 AutoScroll = true
             };
             Controls.Add(panelCanvas);
@@ -213,58 +226,61 @@ namespace PixelArt
         }
         private void CriarFerramentas()
         {
-            int top = 20;
-
-            // Create buttons
-            btnPencil = new Button { Text = "Lápis", Left = 10, Top = top, Width = 100 };
-            btnPencil.Click += (s, e) => { currentTool = "Pencil"; SetActiveButton(btnPencil); };
-            panelFerramentas.Controls.Add(btnPencil);
-
-            btnEraser = new Button { Text = "Borracha", Left = 10, Top = top + 40, Width = 100 };
-            btnEraser.Click += (s, e) => { currentTool = "Eraser"; SetActiveButton(btnEraser); };
-            panelFerramentas.Controls.Add(btnEraser);
-
-            btnBucket = new Button { Text = "Balde", Left = 10, Top = top + 80, Width = 100 };
-            btnBucket.Click += (s, e) => { currentTool = "Bucket"; SetActiveButton(btnBucket); };
-            panelFerramentas.Controls.Add(btnBucket);
-
-            btnRectangle = new Button { Text = "Retângulo", Left = 10, Top = top + 120, Width = 100 };
-            btnRectangle.Click += (s, e) => { currentTool = "Rectangle"; SetActiveButton(btnRectangle); };
-            panelFerramentas.Controls.Add(btnRectangle);
-
-            btnCircle = new Button { Text = "Círculo", Left = 10, Top = top + 160, Width = 100 };
-            btnCircle.Click += (s, e) => { currentTool = "Circle"; SetActiveButton(btnCircle); };
-            panelFerramentas.Controls.Add(btnCircle);
-
-            btnLine = new Button { Text = "Linha", Left = 10, Top = top + 200, Width = 100 };
-            btnLine.Click += (s, e) => { currentTool = "Line"; SetActiveButton(btnLine); };
-            panelFerramentas.Controls.Add(btnLine);
-
-            btnReplaceColor = new Button { Text = "Trocar Cor", Left = 10, Top = top + 240, Width = 100 };
-            btnReplaceColor.Click += (s, e) => { currentTool = "ReplaceColor"; SetActiveButton(btnReplaceColor); };
-            panelFerramentas.Controls.Add(btnReplaceColor);
-
-            btnColorPicker = new Button { Text = "Conta-gotas", Left = 10, Top = top + 280, Width = 100 };
-            btnColorPicker.Click += (s, e) => { currentTool = "ColorPicker"; SetActiveButton(btnColorPicker); };
-            panelFerramentas.Controls.Add(btnColorPicker);
-
-            // Function to handle active button highlighting
-            void SetActiveButton(Button activeBtn)
+            var tools = new (string Text, string Tool)[]
             {
-                foreach (var ctrl in panelFerramentas.Controls)
-                {
-                    if (ctrl is Button btn)
-                        btn.BackColor = SystemColors.Control; // reset all
-                }
-                activeBtn.BackColor = Color.LightBlue; // highlight current
-            }
+                ("Lápis", "Pencil"),
+                ("Borracha", "Eraser"),
+                ("Balde", "Bucket"),
+                ("Retângulo", "Rectangle"),
+                ("Círculo", "Circle"),
+                ("Linha", "Line"),
+                ("Trocar Cor", "ReplaceColor"),
+                ("Conta-gotas", "ColorPicker")
+            };
 
-            // Set default active button
-            SetActiveButton(btnPencil);
+            int top = 10;
+            foreach (var (text, tool) in tools)
+            {
+                var btn = new Button 
+                { 
+                    Text = text, 
+                    Left = 10, 
+                    Top = top, 
+                    Width = 100, 
+                    Height = 50,
+                    FlatStyle = FlatStyle.Flat,
+                    ForeColor = Color.White,
+                    
+                };
+                // flat style
+                btn.FlatAppearance.BorderColor = BTNBORDER;
+                btn.Click += (s, e) => { currentTool = tool; SetActiveButton(btn); };
+
+                panelFerramentas.Controls.Add(btn);
+
+                top += 50;
+
+                AddHoverEffect(btn);
+
+                // save reference for shortcuts
+                toolButtons[tool] = btn;
+            }
+            
+            SetActiveButton((Button)panelFerramentas.Controls[0]);
             currentTool = "Pencil";
 
-        }
 
+        }
+        // Function to handle active button highlighting
+        void SetActiveButton(Button activeBtn)
+        {
+            foreach (var ctrl in panelFerramentas.Controls)
+            {
+                if (ctrl is Button btn)
+                    btn.BackColor = FUNDOBTN; // default button color
+            }
+            activeBtn.BackColor = Color.DarkCyan; // highlight current
+        }
 
         private Panel panelLeftColor;
         private Panel panelRightColor;
@@ -301,8 +317,13 @@ namespace PixelArt
                 Width = 30,
                 Height = 30,
                 Left = 10,
-                Top = inicioY + 3 * (btnSize + margem) + 10
+                Top = inicioY + 3 * (btnSize + margem) + 10,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White,
+                BackColor = FUNDOBTN
+
             };
+            btnAddColor.FlatAppearance.BorderSize = 1;
             btnAddColor.Click += (s, e) =>
             {
                 if (paletteColors.Count < 15)
@@ -319,6 +340,24 @@ namespace PixelArt
                 else
                     MessageBox.Show("A paleta está cheia (máx. 15 cores).", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
+            btnAddColor.FlatAppearance.BorderSize = 1;
+            btnAddColor.FlatAppearance.BorderColor = BTNBORDER;
+            //btnAddColor.ForeColor = Color.FromArgb(45, 45, 45);
+
+            btnAddColor.MouseEnter += (s, e) => // hover effect
+            {
+                if (btnAddColor.BackColor != Color.DarkCyan) // active button
+                    btnAddColor.BackColor = MOUSEHOVERBTN;
+
+            };
+
+            btnAddColor.MouseLeave += (s, e) => // remove hover effect
+            {
+                if (btnAddColor.BackColor != Color.DarkCyan)
+                    btnAddColor.BackColor = FUNDOBTN;
+            };
+
+            AddHoverEffect(btnAddColor);
             panelFuncoes.Controls.Add(btnAddColor);
 
             // Botão de remover cor (trash)
@@ -328,17 +367,34 @@ namespace PixelArt
                 Height = 30,
                 Left = btnAddColor.Right + 80,
                 Top = btnAddColor.Top,
-                Image = PixelArt.Properties.Resources.Trashbtn // Add a trash icon to your resources
+                Image = PixelArt.Properties.Resources.Trashbtn, // Add a trash icon to your resources
+                FlatStyle = FlatStyle.Flat,
             };
+            
+            btnRemoveColor.FlatAppearance.BorderSize = 0; 
             btnRemoveColor.ImageAlign = ContentAlignment.MiddleCenter;
             btnRemoveColor.TextImageRelation = TextImageRelation.Overlay;
             btnRemoveColor.Text = "";
             btnRemoveColor.Click += (s, e) =>
             {
                 removeColorMode = !removeColorMode;
-                btnRemoveColor.BackColor = removeColorMode ? Color.DarkRed : SystemColors.Control;
+                btnRemoveColor.BackColor = removeColorMode ? Color.DarkCyan : FUNDOJANELA;
                 AtualizarPaleta();
             };
+
+            btnRemoveColor.MouseEnter += (s, e) => // hover effect
+            {
+                if (btnRemoveColor.BackColor != Color.DarkCyan) // active button
+                    btnRemoveColor.BackColor = MOUSEHOVERBTN;
+
+            };
+
+            btnRemoveColor.MouseLeave += (s, e) => // remove hover effect
+            {
+                if (btnRemoveColor.BackColor != Color.DarkCyan)
+                    btnRemoveColor.BackColor = FUNDOJANELA;
+            };
+
             panelFuncoes.Controls.Add(btnRemoveColor);
 
             // Painel indicador da cor do botão esquerdo
@@ -354,6 +410,7 @@ namespace PixelArt
             panelFuncoes.Controls.Add(panelLeftColor);
 
             // Painel indicador da cor do botão direito
+
             panelRightColor = new Panel
             {
                 Width = 30,
@@ -361,47 +418,64 @@ namespace PixelArt
                 Left = panelLeftColor.Right + 5,
                 Top = btnAddColor.Top,
                 BackColor = secondaryColor,
-                BorderStyle = BorderStyle.FixedSingle
+                BorderStyle = BorderStyle.FixedSingle,
+              
             };
             panelFuncoes.Controls.Add(panelRightColor);
 
             int mirrorTop = btnAddColor.Bottom + 10;
 
-            btnMirrorH = new Button
+            Button MakeBtn(string text, int left, int width = 30) => new Button
             {
-                Text = "H",
-                Width = 30,
+                Text = text,
+                Width = width,
                 Height = 30,
-                Left = 10,
+                Left = left,
                 Top = mirrorTop,
-                BackColor = Color.LightGray
+                BackColor = FUNDOBTN,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White,
+                UseVisualStyleBackColor = false
             };
+
+            btnMirrorH = MakeBtn("H", 10);
+            btnMirrorV = MakeBtn("V", btnMirrorH.Right + 5);
+            btnMirrorHV = MakeBtn("H+V", btnMirrorV.Right + 5, 45);
+
+            btnMirrorH.FlatAppearance.BorderSize = 1;
+            btnMirrorV.FlatAppearance.BorderSize = 1;
+            btnMirrorHV.FlatAppearance.BorderSize = 1;
+
+            btnMirrorH.FlatAppearance.BorderColor = BTNBORDER;
+            btnMirrorV.FlatAppearance.BorderColor = BTNBORDER;
+            btnMirrorHV.FlatAppearance.BorderColor = BTNBORDER;
+
+            btnMirrorV.Click += (s, e) => AtivarEspelho("V"); 
             btnMirrorH.Click += (s, e) => AtivarEspelho("H");
-            panelFuncoes.Controls.Add(btnMirrorH);
-
-            btnMirrorV = new Button
-            {
-                Text = "V",
-                Width = 30,
-                Height = 30,
-                Left = btnMirrorH.Right + 5,
-                Top = mirrorTop,
-                BackColor = Color.LightGray
-            };
-            btnMirrorV.Click += (s, e) => AtivarEspelho("V");
-            panelFuncoes.Controls.Add(btnMirrorV);
-
-            btnMirrorHV = new Button
-            {
-                Text = "H+V",
-                Width = 45,
-                Height = 30,
-                Left = btnMirrorV.Right + 5,
-                Top = mirrorTop,
-                BackColor = Color.LightGray
-            };
             btnMirrorHV.Click += (s, e) => AtivarEspelho("HV");
+
+            panelFuncoes.Controls.Add(btnMirrorH);
+            panelFuncoes.Controls.Add(btnMirrorV);
             panelFuncoes.Controls.Add(btnMirrorHV);
+
+            AddHoverEffect(btnMirrorH);
+            AddHoverEffect(btnMirrorV);
+            AddHoverEffect(btnMirrorHV);
+        }
+
+        void AddHoverEffect(Button btn)
+        {
+            btn.MouseEnter += (s, e) =>
+            {
+                if (btn.BackColor != Color.DarkCyan) // your active color
+                    btn.BackColor = MOUSEHOVERBTN;
+            };
+
+            btn.MouseLeave += (s, e) =>
+            {
+                if (btn.BackColor != Color.DarkCyan)
+                    btn.BackColor = FUNDOBTN;
+            };
         }
 
         private void AtualizarPaleta()
@@ -430,11 +504,13 @@ namespace PixelArt
                     Enabled = i < paletteColors.Count,
                     FlatStyle = FlatStyle.Flat,
                     Text = "",
-                    Tag = "palette" // Mark for easy removal
+                    Tag = "palette", // Mark for easy removal                                     
                 };
 
                 colorBtn.Tag = "palette";
                 colorBtn.AccessibleDescription = i.ToString(); // Store index for removal
+                colorBtn.FlatAppearance.BorderSize = 1;
+                colorBtn.ForeColor = Color.FromArgb(45,45,45);
 
                 colorBtn.Paint += (s, e) =>
                 {
@@ -485,26 +561,56 @@ namespace PixelArt
                 Width = 120,
                 Height = 30,
                 Left = 10,
-                Top = 10
+                Top = 10,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White,
+                BackColor = FUNDOBTN,
+                FlatAppearance = { BorderColor = BTNBORDER, BorderSize = 1 }
             };
             btnExportar.Click += (s, e) => ExportarPNG();
             panelRodape.Controls.Add(btnExportar);
 
-            Button btnPrevFrame = new Button { Text = "<", Width = 40, Height = 30, Left = 140, Top = 10 };
+            Button btnPrevFrame = new Button { Text = "<", Width = 40, Height = 30, Left = 140, Top = 10,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White,
+                BackColor = FUNDOBTN,
+                FlatAppearance = { BorderColor = BTNBORDER, BorderSize = 1 }
+            };
             btnPrevFrame.Click += (s, e) => TrocarFrame(currentFrameIndex - 1);
             panelRodape.Controls.Add(btnPrevFrame);
 
-            Button btnNextFrame = new Button { Text = ">", Width = 40, Height = 30, Left = 190, Top = 10 };
+            Button btnNextFrame = new Button { Text = ">", Width = 40, Height = 30, Left = 190, Top = 10,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White,
+                BackColor = FUNDOBTN,
+                FlatAppearance = { BorderColor = BTNBORDER, BorderSize = 1 }
+            };
             btnNextFrame.Click += (s, e) => TrocarFrame(currentFrameIndex + 1);
             panelRodape.Controls.Add(btnNextFrame);
 
-            Button btnAddFrame = new Button { Text = "+ Frame", Width = 80, Height = 30, Left = 240, Top = 10 };
+            Button btnAddFrame = new Button { Text = "+ Frame", Width = 80, Height = 30, Left = 240, Top = 10,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White,
+                BackColor = FUNDOBTN,
+                FlatAppearance = { BorderColor = BTNBORDER, BorderSize = 1 }
+            };
             btnAddFrame.Click += (s, e) => AdicionarFrame();
             panelRodape.Controls.Add(btnAddFrame);
 
-            Button btnDeleteFrame = new Button { Text = "- Frame", Width = 80, Height = 30, Left = 330, Top = 10 };
+            Button btnDeleteFrame = new Button { Text = "- Frame", Width = 80, Height = 30, Left = 330, Top = 10 ,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White,
+                BackColor = FUNDOBTN,
+                FlatAppearance = { BorderColor = BTNBORDER, BorderSize = 1 }
+            };
             btnDeleteFrame.Click += (s, e) => RemoverFrame();
             panelRodape.Controls.Add(btnDeleteFrame);
+
+            AddHoverEffect(btnExportar);
+            AddHoverEffect(btnPrevFrame);
+            AddHoverEffect(btnNextFrame);
+            AddHoverEffect(btnAddFrame);
+            AddHoverEffect(btnDeleteFrame);
         }
 
         private void TrocarFrame(int newIndex)
@@ -877,48 +983,49 @@ namespace PixelArt
             pictureBoxCanvas.Invalidate();
         }
 
-        private void ConfigurarAtalhos() // Configura os atalhos de teclado
+        private void ConfigurarAtalhos()
         {
             KeyPreview = true;
             KeyDown += (s, e) =>
             {
-                if (e.Control && e.KeyCode == Keys.S) // Ctrl+S for Save
+                if (e.Control && e.KeyCode == Keys.S)
                     ExportarPNG();
 
-                else if (e.Control && e.KeyCode == Keys.Z) // Ctrl+Z for Undo
+                else if (e.Control && e.KeyCode == Keys.Z)
                     Undo();
 
-                else if (e.Control && e.KeyCode == Keys.B) // Ctrl+B for replace color
-                    btnReplaceColor.PerformClick();
+                else if (e.Control && e.KeyCode == Keys.B)
+                    toolButtons["ReplaceColor"].PerformClick();
 
-                else if (e.Shift && e.KeyCode == Keys.H) // Shift+H for Mirror Horizontal
+                else if (e.Shift && e.KeyCode == Keys.H)
                     btnMirrorH.PerformClick();
 
-                else if (e.Shift && e.KeyCode == Keys.V) // Shift+H for Mirror Vertical
+                else if (e.Shift && e.KeyCode == Keys.V)
                     btnMirrorV.PerformClick();
 
-                else if (e.KeyCode == Keys.P) // P for Pencil
-                    btnPencil.PerformClick();
+                else if (e.KeyCode == Keys.P)
+                    toolButtons["Pencil"].PerformClick();
 
-                else if (e.KeyCode == Keys.E) // E for Eraser
-                    btnEraser.PerformClick();
+                else if (e.KeyCode == Keys.E)
+                    toolButtons["Eraser"].PerformClick();
 
-                else if (e.KeyCode == Keys.B) // B for Bucket
-                    btnBucket.PerformClick();
+                else if (e.KeyCode == Keys.B)
+                    toolButtons["Bucket"].PerformClick();
 
-                else if (e.KeyCode == Keys.C) // C for Circle
-                    btnCircle.PerformClick();
+                else if (e.KeyCode == Keys.C)
+                    toolButtons["Circle"].PerformClick();
 
-                else if (e.KeyCode == Keys.R) // R for Rectangle
-                    btnRectangle.PerformClick();
+                else if (e.KeyCode == Keys.R)
+                    toolButtons["Rectangle"].PerformClick();
 
-                else if (e.KeyCode == Keys.L) // L for Line
-                    btnLine.PerformClick();
+                else if (e.KeyCode == Keys.L)
+                    toolButtons["Line"].PerformClick();
 
-                else if (e.KeyCode == Keys.Q) // Q for Color Picker 
-                    btnColorPicker.PerformClick();
+                else if (e.KeyCode == Keys.Q)
+                    toolButtons["ColorPicker"].PerformClick();
             };
         }
+
 
         private void DesenharForma(Point p1, Point p2)
         {
@@ -1179,15 +1286,15 @@ namespace PixelArt
         private void AtivarEspelho(string mode)
         {
             // Toggle mirror mode between None and the selected mode
-            mirrorMode = mirrorMode == mode ? "None" : mode;
+            mirrorMode = mirrorMode == mode ? "None" : mode; 
             AtualizarBotoesEspelho();
         }
 
         private void AtualizarBotoesEspelho()
         {
-            btnMirrorH.BackColor = mirrorMode == "H" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray; // Highlight if active
-            btnMirrorV.BackColor = mirrorMode == "V" || mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
-            btnMirrorHV.BackColor = mirrorMode == "HV" ? Color.LightBlue : Color.LightGray;
+            btnMirrorH.BackColor = mirrorMode == "H" || mirrorMode == "HV" ? Color.DarkCyan : FUNDOBTN; // Highlight if active
+            btnMirrorV.BackColor = mirrorMode == "V" || mirrorMode == "HV" ? Color.DarkCyan : FUNDOBTN;
+            btnMirrorHV.BackColor = mirrorMode == "HV" ? Color.DarkCyan : FUNDOBTN;
         }
 
         private void AtualizarIndicadoresDeCor()
