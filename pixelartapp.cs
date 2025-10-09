@@ -606,11 +606,30 @@ namespace PixelArt
             btnDeleteFrame.Click += (s, e) => RemoverFrame();
             panelRodape.Controls.Add(btnDeleteFrame);
 
+            Button btnStartOver = new Button { Text = "Recomeçar", Width = 100, Height = 30, Left = 420, Top = 10 ,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White,
+                BackColor = FUNDOBTN,
+                FlatAppearance = { BorderColor = BTNBORDER, BorderSize = 1 }
+            };
+            btnStartOver.Click += (s, e) => 
+            {
+                if (MessageBox.Show("Tem certeza que deseja recomeçar? Isso apagará todo o progresso.", "Confirmação", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                {
+                    frames.Clear();
+                    currentFrameIndex = 0;
+                    InicializarCanvas();
+                    frames.Add(canvasBitmap);
+                }
+            };
+            panelRodape.Controls.Add(btnStartOver);
+
             AddHoverEffect(btnExportar);
             AddHoverEffect(btnPrevFrame);
             AddHoverEffect(btnNextFrame);
             AddHoverEffect(btnAddFrame);
             AddHoverEffect(btnDeleteFrame);
+            AddHoverEffect(btnStartOver);
         }
 
         private void TrocarFrame(int newIndex)
@@ -1301,6 +1320,39 @@ namespace PixelArt
         {
             if (panelLeftColor != null) panelLeftColor.BackColor = currentColor;
             if (panelRightColor != null) panelRightColor.BackColor = secondaryColor;
+        }
+
+        private void StartOver()
+        {
+            // Confirm with the user
+            var result = MessageBox.Show("Are you sure you want to start over? This will erase all frames.",
+                "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (result != DialogResult.Yes) return;
+
+            // Clear all frames and create a fresh empty frame
+            IniciarAcao(); // start undo action
+
+            frames.Clear();
+            Bitmap newFrame = new Bitmap(canvasBitmap.Width, canvasBitmap.Height);
+            using (Graphics g = Graphics.FromImage(newFrame))
+                g.Clear(Color.Transparent);
+
+            frames.Add(newFrame);
+            currentFrameIndex = 0;
+            canvasBitmap = newFrame;
+
+            // Register all pixels as changed for undo
+            for (int x = 0; x < canvasBitmap.Width; x++)
+            {
+                for (int y = 0; y < canvasBitmap.Height; y++)
+                {
+                    RegistrarMudancaPixel(x, y, Color.Transparent);
+                }
+            }
+
+            FinalizarAcao(); // push to undo stack
+            pictureBoxCanvas.Invalidate();
         }
 
         private List<Bitmap> frames = new(); // Lista de frames para animação
