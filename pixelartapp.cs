@@ -12,6 +12,7 @@ namespace PixelArt
 {    
     public partial class Form1 : Form
     {
+        private Label lblFrameIndicator;
 
         readonly Color FUNDOJANELA = Color.FromArgb(60,60,60);
         readonly Color FUNDOBTN = Color.FromArgb(30,30,30);
@@ -22,6 +23,7 @@ namespace PixelArt
         private Panel panelCanvas;
         private Panel panelFuncoes;
         private Panel panelRodape;
+
         private PictureBox pictureBoxCanvas;
 
         private Bitmap canvasBitmap;
@@ -51,6 +53,7 @@ namespace PixelArt
         private Button btnLine;
         private Button btnReplaceColor;
         private Button btnColorPicker;
+
 
         // At the class level (top of your Form)
         private Dictionary<string, Button> toolButtons = new(); // Map tool names to buttons
@@ -579,7 +582,23 @@ namespace PixelArt
             btnPrevFrame.Click += (s, e) => TrocarFrame(currentFrameIndex - 1);
             panelRodape.Controls.Add(btnPrevFrame);
 
-            Button btnNextFrame = new Button { Text = ">", Width = 40, Height = 30, Left = 190, Top = 10,
+            Label lblFrameIndicator = new Label
+            {
+                Width = 80,
+                Height = 30,
+                Left = 180, // position it between Prev and Next frame buttons
+                Top = 10,
+                TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(45, 45, 45), // optional dark background
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Text = $"Frame: {currentFrameIndex + 1}/{frames.Count}"
+            };
+
+            panelRodape.Controls.Add(lblFrameIndicator);
+
+
+            Button btnNextFrame = new Button { Text = ">", Width = 40, Height = 30, Left = 260, Top = 10,
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White,
                 BackColor = FUNDOBTN,
@@ -588,7 +607,7 @@ namespace PixelArt
             btnNextFrame.Click += (s, e) => TrocarFrame(currentFrameIndex + 1);
             panelRodape.Controls.Add(btnNextFrame);
 
-            Button btnAddFrame = new Button { Text = "+ Frame", Width = 80, Height = 30, Left = 240, Top = 10,
+            Button btnAddFrame = new Button { Text = "+ Frame", Width = 80, Height = 30, Left = 310, Top = 10,
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White,
                 BackColor = FUNDOBTN,
@@ -597,7 +616,7 @@ namespace PixelArt
             btnAddFrame.Click += (s, e) => AdicionarFrame();
             panelRodape.Controls.Add(btnAddFrame);
 
-            Button btnDeleteFrame = new Button { Text = "- Frame", Width = 80, Height = 30, Left = 330, Top = 10 ,
+            Button btnDeleteFrame = new Button { Text = "- Frame", Width = 80, Height = 30, Left = 400, Top = 10 ,
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White,
                 BackColor = FUNDOBTN,
@@ -606,7 +625,7 @@ namespace PixelArt
             btnDeleteFrame.Click += (s, e) => RemoverFrame();
             panelRodape.Controls.Add(btnDeleteFrame);
 
-            Button btnStartOver = new Button { Text = "Recomeçar", Width = 100, Height = 30, Left = 420, Top = 10 ,
+            Button btnStartOver = new Button { Text = "Recomeçar", Width = 100, Height = 30, Left = 800, Top = 10 ,
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White,
                 BackColor = FUNDOBTN,
@@ -623,6 +642,8 @@ namespace PixelArt
                 }
             };
             panelRodape.Controls.Add(btnStartOver);
+
+            panelRodape.Controls.Add(lblFrameIndicator);
 
             AddHoverEffect(btnExportar);
             AddHoverEffect(btnPrevFrame);
@@ -641,6 +662,9 @@ namespace PixelArt
             pictureBoxCanvas.Width = canvasBitmap.Width * pixelSize;
             pictureBoxCanvas.Height = canvasBitmap.Height * pixelSize;
             pictureBoxCanvas.Invalidate();
+            // Safely update frame indicator
+            if (lblFrameIndicator != null)
+                lblFrameIndicator.Text = $"Frame: {currentFrameIndex + 1}/{frames.Count}";
         }
 
         private void AdicionarFrame()
@@ -658,10 +682,10 @@ namespace PixelArt
             frames.RemoveAt(currentFrameIndex);
             if (currentFrameIndex >= frames.Count)
                 currentFrameIndex = frames.Count - 1;
-            canvasBitmap = frames[currentFrameIndex];
-            pictureBoxCanvas.Image = canvasBitmap;
-            pictureBoxCanvas.Invalidate();
+
+            TrocarFrame(currentFrameIndex); // will update canvas and label
         }
+
         private void ExportarPNG()
         {
             using (SaveFileDialog sfd = new SaveFileDialog())
